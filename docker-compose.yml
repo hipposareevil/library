@@ -1,0 +1,75 @@
+version: "3.8"
+
+services:
+  mariadb:
+    image: mariadb:11
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: library
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: mysql+pymysql://${DB_USER}:${DB_PASSWORD}@mariadb:3306/library
+      JWT_SECRET: ${JWT_SECRET}
+      B2_KEY_ID: ${B2_KEY_ID}
+      B2_APP_KEY: ${B2_APP_KEY}
+      B2_BUCKET_NAME: ${B2_BUCKET_NAME}
+      B2_ENDPOINT: ${B2_ENDPOINT}
+      ADMIN_USERNAME: ${ADMIN_USERNAME}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      OPENLIBRARY_BASE_URL: ${OPENLIBRARY_BASE_URL:-https://openlibrary.org}
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    command: >
+      sh -c "alembic upgrade head &&
+             python -m scripts.seed_admin &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+  import-worker:
+    build: ./backend
+    profiles:
+      - import
+    environment:
+      DATABASE_URL: mysql+pymysql://${DB_USER}:${DB_PASSWORD}@mariadb:3306/library
+      B2_KEY_ID: ${B2_KEY_ID}
+      B2_APP_KEY: ${B2_APP_KEY}
+      B2_BUCKET_NAME: ${B2_BUCKET_NAME}
+      B2_ENDPOINT: ${B2_ENDPOINT}
+    volumes:
+      - ./opf:/data/opf:ro
+      - ./epub:/data/epub:ro
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    command: >
+      sh -c "alembic upgrade head &&
+             python -m scripts.import_opf /data/opf &&
+             python -m scripts.import_epub /data/epub &&
+             python -m scripts.upload_covers /data/opf /data/epub &&
+             python -m scripts.upload_epubs /data/epub"
+    restart: "no"
+
+volumes:
+  mariadb_data:

@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Environment
+.env
+
+# Build
+frontend/dist/
+backend/*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker
+mariadb_data/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data directories (too large for git)
+opf/
+epub/
