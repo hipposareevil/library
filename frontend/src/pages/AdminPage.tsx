@@ -1,0 +1,344 @@
+import { useState, type FormEvent } from "react";
+import { Navigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import Header from "../components/layout/Header";
+import { useAuth } from "../context/AuthContext";
+import { useBooks } from "../hooks/useBooks";
+import {
+  createBook,
+  updateBook,
+  deleteBook,
+  uploadEpub,
+  extractEpubMetadata,
+} from "../api/books";
+import type { BookListItem } from "../types/book";
+
+interface BookFormData {
+  title: string;
+  author: string;
+  publisher: string;
+  publish_date: string;
+  isbn: string;
+  language: string;
+  description: string;
+  rating: number;
+  series_name: string;
+  series_index: string;
+  tags: string;
+}
+
+const emptyForm: BookFormData = {
+  title: "",
+  author: "",
+  publisher: "",
+  publish_date: "",
+  isbn: "",
+  language: "eng",
+  description: "",
+  rating: 0,
+  series_name: "",
+  series_index: "",
+  tags: "",
+};
+
+export default function AdminPage() {
+  const { isAuthenticated } = useAuth();
+  const queryClient = useQueryClient();
+  const [page, setPage] = useState(1);
+  const { data } = useBooks({ page, per_page: 20, sort: "created_at", order: "desc" });
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [form, setForm] = useState<BookFormData>(emptyForm);
+  const [epubFile, setEpubFile] = useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" />;
+  }
+
+  const handleEpubChange = async (file: File | null) => {
+    setEpubFile(file);
+    if (file) {
+      try {
+        const meta = await extractEpubMetadata(file);
+        setForm((prev) => ({
+          ...prev,
+          title: (meta.title as string) || prev.title,
+          author: (meta.author as string) || prev.author,
+          publisher: (meta.publisher as string) || prev.publisher,
+          isbn: (meta.isbn as string) || prev.isbn,
+          description: (meta.description as string) || prev.description,
+          publish_date: (meta.publish_date as string) || prev.publish_date,
+          language: (meta.language as string) || prev.language,
+        }));
+      } catch {
+        // EPUB parsing failed, ignore
+      }
+    }
+  };
+
+  const handleEdit = (book: BookListItem) => {
+    setEditingId(book.id);
+    setForm({
+      title: book.title,
+      author: book.author || "",
+      publisher: book.publisher || "",
+      publish_date: book.publish_date || "",
+      isbn: book.isbn || "",
+      language: book.language || "eng",
+      description: "",
+      rating: book.rating,
+      series_name: book.series_name || "",
+      series_index: book.series_index?.toString() || "",
+      tags: book.tags.map((t) => t.name).join(", "),
+    });
+    setShowForm(true);
+  };
+
+  const handleDelete = async (bookId: number) => {
+    if (!confirm("Delete this book?")) return;
+    await deleteBook(bookId);
+    queryClient.invalidateQueries({ queryKey: ["books"] });
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const payload = {
+        title: form.title,
+        author: form.author || null,
+        publisher: form.publisher || null,
+        publish_date: form.publish_date || null,
+        isbn: form.isbn || null,
+        language: form.language || "eng",
+        description: form.description || null,
+        rating: form.rating,
+        series_name: form.series_name || null,
+        series_index: form.series_index ? parseFloat(form.series_index) : null,
+        tags: form.tags
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean),
+      };
+
+      let bookId: number;
+      if (editingId) {
+        const updated = await updateBook(editingId, payload);
+        bookId = updated.id;
+      } else {
+        const created = await createBook(payload);
+        bookId = created.id;
+      }
+
+      if (epubFile) {
+        await uploadEpub(bookId, epubFile);
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["books"] });
+      setShowForm(false);
+      setEditingId(null);
+      setForm(emptyForm);
+      setEpubFile(null);
+    } catch (err) {
+      alert("Failed to save book");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const books = data?.items ?? [];
+  const pages = data?.pages ?? 0;
+
+  return (
+    <>
+      <Header />
+      <main className="container" style={{ padding: "2rem 1.5rem" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
+          <h1>Manage Books</h1>
+          <button
+            className="btn btn-primary"
+            onClick={() => {
+              setShowForm(true);
+              setEditingId(null);
+              setForm(emptyForm);
+              setEpubFile(null);
+            }}
+          >
+            + Add Book
+          </button>
+        </div>
+
+        {showForm && (
+          <div className="modal-overlay" onClick={() => setShowForm(false)}>
+            <div className="modal" onClick={(e) => e.stopPropagation()}>
+              <h2>{editingId ? "Edit Book" : "Add Book"}</h2>
+              <form onSubmit={handleSubmit}>
+                {!editingId && (
+                  <div className="form-group">
+                    <label>EPUB File (optional)</label>
+                    <input
+                      type="file"
+                      accept=".epub"
+                      className="input"
+                      onChange={(e) => handleEpubChange(e.target.files?.[0] || null)}
+                    />
+                  </div>
+                )}
+                <div className="form-group">
+                  <label>Title *</label>
+                  <input
+                    className="input"
+                    value={form.title}
+                    onChange={(e) => setForm({ ...form, title: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Author</label>
+                  <input
+                    className="input"
+                    value={form.author}
+                    onChange={(e) => setForm({ ...form, author: e.target.value })}
+                  />
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                  <div className="form-group">
+                    <label>Publisher</label>
+                    <input
+                      className="input"
+                      value={form.publisher}
+                      onChange={(e) => setForm({ ...form, publisher: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Publish Date</label>
+                    <input
+                      type="date"
+                      className="input"
+                      value={form.publish_date}
+                      onChange={(e) => setForm({ ...form, publish_date: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                  <div className="form-group">
+                    <label>ISBN</label>
+                    <input
+                      className="input"
+                      value={form.isbn}
+                      onChange={(e) => setForm({ ...form, isbn: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Language</label>
+                    <input
+                      className="input"
+                      value={form.language}
+                      onChange={(e) => setForm({ ...form, language: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.75rem" }}>
+                  <div className="form-group">
+                    <label>Rating (0-10)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={10}
+                      className="input"
+                      value={form.rating}
+                      onChange={(e) => setForm({ ...form, rating: Number(e.target.value) })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Series</label>
+                    <input
+                      className="input"
+                      value={form.series_name}
+                      onChange={(e) => setForm({ ...form, series_name: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Series #</label>
+                    <input
+                      className="input"
+                      value={form.series_index}
+                      onChange={(e) => setForm({ ...form, series_index: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Tags (comma-separated)</label>
+                  <input
+                    className="input"
+                    value={form.tags}
+                    onChange={(e) => setForm({ ...form, tags: e.target.value })}
+                    placeholder="Fiction, Science Fiction, Space"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Description</label>
+                  <textarea
+                    className="input"
+                    rows={4}
+                    value={form.description}
+                    onChange={(e) => setForm({ ...form, description: e.target.value })}
+                    style={{ width: "100%", resize: "vertical" }}
+                  />
+                </div>
+                <div className="modal-actions">
+                  <button type="button" className="btn btn-secondary" onClick={() => setShowForm(false)}>
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn btn-primary" disabled={saving}>
+                    {saving ? "Saving..." : editingId ? "Update" : "Create"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        <div className="book-list">
+          {books.map((book) => (
+            <div key={book.id} className="book-list-item" style={{ cursor: "default" }}>
+              <div className="book-list-info">
+                <div className="book-list-title">{book.title}</div>
+                <div className="book-list-author">{book.author}</div>
+              </div>
+              <div className="admin-actions">
+                <button className="btn btn-secondary btn-sm" onClick={() => handleEdit(book)}>
+                  Edit
+                </button>
+                <button className="btn btn-danger btn-sm" onClick={() => handleDelete(book.id)}>
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {pages > 1 && (
+          <div className="pagination">
+            <button
+              className="btn btn-secondary btn-sm"
+              disabled={page === 1}
+              onClick={() => setPage((p) => p - 1)}
+            >
+              Previous
+            </button>
+            <span className="pagination-info">Page {page} of {pages}</span>
+            <button
+              className="btn btn-secondary btn-sm"
+              disabled={page === pages}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Next
+            </button>
+          </div>
+        )}
+      </main>
+    </>
+  );
+}
