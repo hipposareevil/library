@@ -63,7 +63,7 @@ def get_system_status(
         db.execute(text("SELECT 1"))
         db_name = settings.database_url.rsplit("/", 1)[-1]
         book_count = db.query(Book).count()
-        epub_count = db.query(Book).filter(Book.has_epub == True).count()
+        epub_count = db.query(Book).filter(Book.epub_key.isnot(None)).count()
         db_status = {"connected": True, "name": db_name, "book_count": book_count}
     except Exception as e:
         db_status = {"connected": False, "error": str(e), "book_count": 0}
