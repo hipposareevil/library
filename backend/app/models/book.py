@@ -4,6 +4,7 @@ from sqlalchemy import (
     Boolean, Column, Date, DateTime, Float, ForeignKey, Index, Integer,
     String, Text, UniqueConstraint,
 )
+from sqlalchemy.dialects.mysql import MEDIUMTEXT
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -43,7 +44,7 @@ class Book(Base):
     google_id = Column(String(50), nullable=True)
     amazon_id = Column(String(50), nullable=True)
     language = Column(String(10), default="eng")
-    description = Column(Text, nullable=True)
+    description = Column(MEDIUMTEXT, nullable=True)
     notes = Column(Text, nullable=True)
 
     cover_key = Column(String(255), nullable=True)

@@ -208,6 +208,7 @@ def main(opf_dir: str = "/data/opf"):
 
             except Exception as e:
                 errors += 1
+                db.rollback()
                 print(f"  Error parsing {os.path.basename(filepath)}: {e}")
 
         db.commit()
