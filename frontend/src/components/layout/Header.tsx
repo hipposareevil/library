@@ -18,7 +18,12 @@ export default function Header() {
   return (
     <header className="hero">
       <div className="container hero-inner">
-        <Link to="/" style={{ textDecoration: "none", color: "inherit" }}>
+        <Link to="/" style={{ textDecoration: "none", color: "inherit" }} className="hero-brand">
+          <img
+            src="/android-chrome-192x192.png"
+            alt="Library"
+            className="hero-logo"
+          />
           <h1 className="hero-title">Library</h1>
         </Link>
         <div className="hero-controls">
@@ -39,7 +44,13 @@ export default function Header() {
                 className="btn btn-secondary btn-sm"
                 onClick={() => navigate("/admin")}
               >
-                Manage
+                Books
+              </button>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => navigate("/manage")}
+              >
+                System
               </button>
               <button className="btn btn-secondary btn-sm" onClick={logout}>
                 Logout

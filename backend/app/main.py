@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import auth, books, tags, admin, covers
+from app.routers import auth, books, tags, admin, covers, manage
 
 
 app = FastAPI(title="Library API", version="1.0.0")
@@ -19,6 +19,7 @@ app.include_router(books.router, prefix="/api/books", tags=["books"])
 app.include_router(tags.router, prefix="/api/tags", tags=["tags"])
 app.include_router(covers.router, prefix="/api/covers", tags=["covers"])
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
+app.include_router(manage.router, prefix="/api/admin", tags=["manage"])
 
 
 @app.get("/api/health")
