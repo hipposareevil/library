@@ -31,6 +31,7 @@ export interface BookDetail extends BookListItem {
   google_id: string | null;
   amazon_id: string | null;
   description: string | null;
+  notes: string | null;
   epub_key: string | null;
   created_at: string | null;
   updated_at: string | null;
