@@ -21,7 +21,7 @@ class Tag(Base):
     __tablename__ = "tags"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String(100), nullable=False, unique=True, index=True)
+    name = Column(String(500), nullable=False, unique=True, index=True)
 
     books = relationship("Book", secondary="book_tags", back_populates="tags")
 

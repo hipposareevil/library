@@ -61,6 +61,7 @@ def main(epub_dir: str = "/data/epub"):
 
             except Exception as e:
                 errors += 1
+                db.rollback()
                 print(f"  Error parsing {filepath}: {e}")
 
         db.commit()
