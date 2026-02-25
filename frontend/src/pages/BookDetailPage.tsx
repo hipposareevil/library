@@ -1,4 +1,4 @@
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import DOMPurify from "dompurify";
 import Header from "../components/layout/Header";
 import BookCover from "../components/books/BookCover";
@@ -10,6 +10,7 @@ import { getDownloadUrl } from "../api/books";
 export default function BookDetailPage() {
   const { id } = useParams();
   const bookId = Number(id);
+  const navigate = useNavigate();
   const { data: book, isLoading } = useBook(bookId);
   const { data: overview } = useBookOverview(bookId, book?.isbn ?? null);
   const { isAuthenticated } = useAuth();
@@ -42,9 +43,17 @@ export default function BookDetailPage() {
     <>
       <Header />
       <main className="container detail-page">
-        <Link to="/" className="btn btn-secondary btn-sm" style={{ marginBottom: "1rem" }}>
-          &larr; Back
-        </Link>
+        <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1rem" }}>
+          <Link to="/" className="btn btn-secondary btn-sm">&larr; Back</Link>
+          {isAuthenticated && (
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => navigate("/admin", { state: { editBook: book } })}
+            >
+              Edit
+            </button>
+          )}
+        </div>
 
         <div className="detail-layout">
           <div>
@@ -117,6 +126,15 @@ export default function BookDetailPage() {
                 <h2>About This Book (OpenLibrary)</h2>
                 <div className="detail-description">
                   <p>{overviewDesc}</p>
+                </div>
+              </div>
+            )}
+
+            {book.notes && (
+              <div className="detail-section">
+                <h2>Notes</h2>
+                <div className="detail-description" style={{ whiteSpace: "pre-wrap" }}>
+                  {book.notes}
                 </div>
               </div>
             )}

@@ -44,6 +44,15 @@ def get_download_url(b2_key: str) -> str:
     return bucket.get_download_url(b2_key)
 
 
+def download_bytes(b2_key: str) -> bytes:
+    bucket = _get_bucket()
+    downloaded = bucket.download_file_by_name(b2_key)
+    buf = io.BytesIO()
+    downloaded.save(buf)
+    buf.seek(0)
+    return buf.read()
+
+
 def delete_file(b2_key: str) -> None:
     bucket = _get_bucket()
     file_version = bucket.get_file_info_by_name(b2_key)

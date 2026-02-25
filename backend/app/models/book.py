@@ -44,6 +44,7 @@ class Book(Base):
     amazon_id = Column(String(50), nullable=True)
     language = Column(String(10), default="eng")
     description = Column(Text, nullable=True)
+    notes = Column(Text, nullable=True)
 
     cover_key = Column(String(255), nullable=True)
     epub_key = Column(String(255), nullable=True)

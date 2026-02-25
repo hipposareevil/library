@@ -36,6 +36,7 @@ class BookDetail(BookListItem):
     google_id: str | None = None
     amazon_id: str | None = None
     description: str | None = None
+    notes: str | None = None
     epub_key: str | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
@@ -53,6 +54,7 @@ class BookCreate(BaseModel):
     amazon_id: str | None = None
     language: str | None = "eng"
     description: str | None = None
+    notes: str | None = None
     rating: int = 0
     series_name: str | None = None
     series_index: float | None = None
@@ -71,6 +73,7 @@ class BookUpdate(BaseModel):
     amazon_id: str | None = None
     language: str | None = None
     description: str | None = None
+    notes: str | None = None
     rating: int | None = None
     series_name: str | None = None
     series_index: float | None = None

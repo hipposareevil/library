@@ -55,3 +55,15 @@ export async function extractEpubMetadata(
   const { data } = await api.post("/admin/books/extract-epub", formData);
   return data;
 }
+
+export async function uploadCoverFile(bookId: number, blob: Blob): Promise<void> {
+  const formData = new FormData();
+  formData.append("file", blob, "cover.jpg");
+  await api.post(`/admin/books/${bookId}/cover`, formData);
+}
+
+export async function uploadCoverUrl(bookId: number, url: string): Promise<void> {
+  const formData = new FormData();
+  formData.append("cover_url", url);
+  await api.post(`/admin/books/${bookId}/cover`, formData);
+}
