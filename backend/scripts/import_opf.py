@@ -135,6 +135,7 @@ def parse_opf(filepath: str) -> dict:
 
 
 def get_or_create_tag(db, name: str) -> Tag:
+    name = name[:500]  # guard against subjects longer than the column
     tag = db.query(Tag).filter(Tag.name == name).first()
     if not tag:
         tag = Tag(name=name)
