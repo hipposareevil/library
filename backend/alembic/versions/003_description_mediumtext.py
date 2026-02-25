@@ -18,18 +18,10 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.alter_column(
-        "books",
-        "description",
-        type_=mysql.MEDIUMTEXT(),
-        existing_nullable=True,
-    )
+    # Use raw SQL — op.alter_column without existing_type generates incomplete
+    # DDL for MySQL and FULLTEXT-indexed columns require explicit MODIFY COLUMN.
+    op.execute("ALTER TABLE books MODIFY COLUMN description MEDIUMTEXT NULL")
 
 
 def downgrade() -> None:
-    op.alter_column(
-        "books",
-        "description",
-        type_=sa.Text(),
-        existing_nullable=True,
-    )
+    op.execute("ALTER TABLE books MODIFY COLUMN description TEXT NULL")
