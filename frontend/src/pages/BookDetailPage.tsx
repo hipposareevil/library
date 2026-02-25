@@ -34,7 +34,9 @@ export default function BookDetailPage() {
 
   const year = book.publish_date ? new Date(book.publish_date).getFullYear() : null;
   const overviewDesc =
-    overview && !("detail" in overview) ? (overview as Record<string, unknown>).work_description : null;
+    overview && !("detail" in overview)
+      ? String((overview as Record<string, unknown>).work_description ?? "")
+      : "";
 
   return (
     <>
@@ -110,7 +112,7 @@ export default function BookDetailPage() {
               </div>
             )}
 
-            {overviewDesc && typeof overviewDesc === "string" && (
+            {overviewDesc && (
               <div className="detail-section">
                 <h2>About This Book (OpenLibrary)</h2>
                 <div className="detail-description">

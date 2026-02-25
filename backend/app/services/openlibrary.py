@@ -4,6 +4,8 @@ from app.config import settings
 
 _cache: dict[str, dict | None] = {}
 
+USER_AGENT = 'My Books (hipposareevil@protonmail.com)'
+
 
 async def get_book_overview(isbn: str) -> dict | None:
     """Fetch book overview from OpenLibrary by ISBN. Returns cached result if available."""
@@ -11,8 +13,9 @@ async def get_book_overview(isbn: str) -> dict | None:
         return _cache[isbn]
 
     base = settings.openlibrary_base_url
+    headers = {"User-Agent": USER_AGENT}
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=10.0, headers=headers) as client:
             # Try ISBN lookup
             resp = await client.get(f"{base}/isbn/{isbn}.json")
             if resp.status_code != 200:
