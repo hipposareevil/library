@@ -12,6 +12,7 @@ import {
   uploadCoverFile,
   uploadCoverUrl,
   extractEpubMetadata,
+  fetchOpenLibraryMetadata,
   getCoverUrl,
 } from "../api/books";
 import type { BookListItem, BookDetail } from "../types/book";
@@ -86,6 +87,8 @@ export default function AdminPage() {
   const [coverUrlInput, setCoverUrlInput] = useState("");
   const [saving, setSaving] = useState(false);
   const [extracting, setExtracting] = useState(false);
+  const [fetchingMeta, setFetchingMeta] = useState(false);
+  const [metaFeedback, setMetaFeedback] = useState("");
 
   // Open edit form when navigated from BookDetailPage with state
   useEffect(() => {
@@ -133,6 +136,7 @@ export default function AdminPage() {
     setEpubFile(null);
     setCoverB64(null);
     setCoverUrlInput("");
+    setMetaFeedback("");
   };
 
   const handleEpubChange = async (file: File | null) => {
@@ -156,6 +160,51 @@ export default function AdminPage() {
       // ignore parse failures
     } finally {
       setExtracting(false);
+    }
+  };
+
+  const handleFetchMetadata = async () => {
+    if (!editingId) return;
+    setFetchingMeta(true);
+    setMetaFeedback("");
+    try {
+      const meta = await fetchOpenLibraryMetadata(editingId);
+      let filled: string[] = [];
+      setForm((prev) => {
+        const next = { ...prev };
+        const fill = (key: keyof typeof prev, val: unknown) => {
+          if (val && !prev[key]) {
+            (next as Record<string, unknown>)[key] = val;
+            filled.push(key);
+          }
+        };
+        fill("title", meta.title);
+        fill("author", meta.author);
+        fill("publisher", meta.publisher);
+        fill("publish_date", meta.publish_date);
+        fill("description", meta.description);
+        fill("language", meta.language);
+        fill("isbn", meta.isbn);
+        if (!prev.tags && Array.isArray(meta.subjects) && meta.subjects.length > 0) {
+          next.tags = (meta.subjects as string[]).join(", ");
+          filled.push("tags");
+        }
+        return next;
+      });
+      // Set cover URL if nothing is queued yet
+      if (!coverB64 && !coverUrlInput && meta.cover_url) {
+        setCoverUrlInput(meta.cover_url as string);
+        filled.push("cover");
+      }
+      setMetaFeedback(
+        filled.length > 0
+          ? `Filled: ${filled.join(", ")}`
+          : "Nothing new to fill — all fields already have values."
+      );
+    } catch {
+      setMetaFeedback("No metadata found on OpenLibrary.");
+    } finally {
+      setFetchingMeta(false);
     }
   };
 
@@ -251,6 +300,34 @@ export default function AdminPage() {
               ← Back
             </button>
             <h1>{editingId ? "Edit Book" : "Add Book"}</h1>
+            {editingId && (
+              <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                {metaFeedback && (
+                  <span style={{ fontSize: "0.85rem", color: metaFeedback.startsWith("No") || metaFeedback.startsWith("Nothing") ? "var(--text-secondary)" : "var(--accent)" }}>
+                    {metaFeedback}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={handleFetchMetadata}
+                  disabled={fetchingMeta}
+                  title="Search OpenLibrary for this book's metadata and fill in empty fields"
+                >
+                  {fetchingMeta ? (
+                    "Fetching…"
+                  ) : (
+                    <>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: "0.3rem" }}>
+                        <circle cx="11" cy="11" r="8" />
+                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                      </svg>
+                      Get Metadata
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
           </div>
 
           <form onSubmit={handleSubmit} className="book-form-layout">

@@ -12,6 +12,7 @@ from app.models.book import Book
 from app.schemas.book import BookCreate, BookDetail, BookUpdate
 from app.services.book_service import set_book_tags
 from app.services import b2_service, epub_service
+from app.services.openlibrary import fetch_metadata_for_book
 
 router = APIRouter()
 
@@ -215,6 +216,24 @@ async def upload_cover(
     book.cover_key = cover_key
     db.commit()
     return {"detail": "Cover uploaded"}
+
+
+@router.get("/books/{book_id}/fetch-metadata")
+async def fetch_book_openlibrary_metadata(
+    book_id: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(get_current_user),
+):
+    """Fetch structured metadata from OpenLibrary to populate the edit form."""
+    book = db.query(Book).filter(Book.id == book_id).first()
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+
+    metadata = await fetch_metadata_for_book(book.isbn, book.title, book.author)
+    if not metadata:
+        raise HTTPException(status_code=404, detail="No metadata found on OpenLibrary")
+
+    return metadata
 
 
 @router.get("/books/{book_id}/download")
