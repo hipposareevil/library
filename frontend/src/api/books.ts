@@ -67,3 +67,8 @@ export async function uploadCoverUrl(bookId: number, url: string): Promise<void>
   formData.append("cover_url", url);
   await api.post(`/admin/books/${bookId}/cover`, formData);
 }
+
+export async function fetchOpenLibraryMetadata(bookId: number): Promise<Record<string, unknown>> {
+  const { data } = await api.get(`/admin/books/${bookId}/fetch-metadata`);
+  return data;
+}
