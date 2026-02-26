@@ -28,3 +28,4 @@ Thumbs.db
 # Data directories (too large for git)
 opf/
 epub/
+*~
