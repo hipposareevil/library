@@ -13,6 +13,8 @@ import type { BookListItem, BookSearchParams, ViewMode } from "../types/book";
 
 export default function HomePage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  // Both q and author live in the URL so they survive back-navigation
+  const qParam = searchParams.get("q") || undefined;
   const authorParam = searchParams.get("author") || undefined;
 
   const [view, setView] = useState<ViewMode>(() => {
@@ -28,19 +30,20 @@ export default function HomePage() {
   const [allBooks, setAllBooks] = useState<BookListItem[]>([]);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-  const { data, isLoading } = useBooks({
+  const { data, isLoading, isFetching } = useBooks({
     ...params,
+    q: qParam,
     tags: selectedTags.length > 0 ? selectedTags.join(",") : undefined,
     author: authorParam,
   });
   const { data: tags } = useTags();
 
-  // Reset to page 1 when author filter changes from URL
+  // Reset to page 1 when URL filters change
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     setParams((prev) => ({ ...prev, page: 1 }));
     setAllBooks([]);
-  }, [authorParam]);
+  }, [qParam, authorParam]);
 
   // Accumulate books: replace on page 1, append on subsequent pages
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -61,7 +64,7 @@ export default function HomePage() {
       (entries) => {
         if (
           entries[0].isIntersecting &&
-          !isLoading &&
+          !isFetching &&
           data &&
           (params.page ?? 1) < (data.pages ?? 1)
         ) {
@@ -72,7 +75,7 @@ export default function HomePage() {
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [isLoading, data, params.page]);
+  }, [isFetching, data, params.page]);
 
   const handleViewChange = useCallback((v: ViewMode) => {
     setView(v);
@@ -80,9 +83,16 @@ export default function HomePage() {
   }, []);
 
   const handleSearch = useCallback((q: string) => {
-    setParams((prev) => ({ ...prev, q: q || undefined, page: 1 }));
-    setAllBooks([]);
-  }, []);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (q) {
+        next.set("q", q);
+      } else {
+        next.delete("q");
+      }
+      return next;
+    });
+  }, [setSearchParams]);
 
   const handleSort = useCallback((field: string) => {
     setParams((prev) => ({
@@ -110,8 +120,18 @@ export default function HomePage() {
     });
   }, [setSearchParams]);
 
+  const clearSearch = useCallback(() => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("q");
+      return next;
+    });
+  }, [setSearchParams]);
+
   const total = data?.total ?? 0;
   const hasMore = (params.page ?? 1) < (data?.pages ?? 1);
+  // isFetching is true while a new query is in-flight (even with placeholderData)
+  const isWorking = isLoading || (isFetching && allBooks.length === 0);
 
   return (
     <>
@@ -119,7 +139,7 @@ export default function HomePage() {
       <main className="container">
         <div className="toolbar">
           <div className="toolbar-left">
-            <SearchBar value={params.q ?? ""} onChange={handleSearch} />
+            <SearchBar value={qParam ?? ""} onChange={handleSearch} />
             <button
               className="btn btn-secondary btn-sm"
               onClick={() => {
@@ -140,9 +160,14 @@ export default function HomePage() {
           </div>
         </div>
 
-        {(authorParam || selectedTags.length > 0) && (
+        {(authorParam || qParam || selectedTags.length > 0) && (
           <div className="filter-bar">
             <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>Filtering:</span>
+            {qParam && (
+              <span className="filter-tag" onClick={clearSearch}>
+                Search: {qParam} <span className="remove">&times;</span>
+              </span>
+            )}
             {authorParam && (
               <span className="filter-tag" onClick={clearAuthor}>
                 Author: {authorParam} <span className="remove">&times;</span>
@@ -153,10 +178,11 @@ export default function HomePage() {
                 {t} <span className="remove">&times;</span>
               </span>
             ))}
-            {(authorParam && selectedTags.length > 0) || selectedTags.length > 1 ? (
+            {[qParam, authorParam, ...selectedTags].filter(Boolean).length > 1 ? (
               <span
                 className="filter-tag"
                 onClick={() => {
+                  clearSearch();
                   clearAuthor();
                   setSelectedTags([]);
                   setParams((prev) => ({ ...prev, page: 1 }));
@@ -169,7 +195,7 @@ export default function HomePage() {
           </div>
         )}
 
-        {tags && tags.length > 0 && !selectedTags.length && !authorParam && (
+        {tags && tags.length > 0 && !selectedTags.length && !authorParam && !qParam && (
           <div style={{ display: "flex", gap: "0.3rem", flexWrap: "wrap", padding: "0.5rem 0" }}>
             {tags
               .filter((t) => t.count > 10)
@@ -182,7 +208,7 @@ export default function HomePage() {
           </div>
         )}
 
-        {allBooks.length === 0 && !isLoading && (
+        {allBooks.length === 0 && !isWorking && (
           <div className="loading">No books found.</div>
         )}
 
@@ -205,13 +231,13 @@ export default function HomePage() {
         {/* Infinite scroll sentinel */}
         <div ref={sentinelRef} style={{ height: 1 }} />
 
-        {isLoading && (
+        {isWorking && (
           <div className="loading" style={{ padding: "1rem 0" }}>
             {allBooks.length === 0 ? "Loading books…" : "Loading more…"}
           </div>
         )}
 
-        {!isLoading && !hasMore && allBooks.length > 0 && (
+        {!isFetching && !hasMore && allBooks.length > 0 && (
           <div style={{ textAlign: "center", padding: "1rem 0", fontSize: "0.85rem", color: "var(--text-muted)" }}>
             {total} books total
           </div>
