@@ -91,7 +91,7 @@ export default function HomePage() {
         next.delete("q");
       }
       return next;
-    });
+    }, { replace: true }); // replace so typing doesn't flood browser history
   }, [setSearchParams]);
 
   const handleSort = useCallback((field: string) => {
