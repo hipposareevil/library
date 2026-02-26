@@ -65,3 +65,20 @@ export async function importData(
   });
   return data;
 }
+
+export interface BackupEntry {
+  b2_key: string;
+  filename: string;
+  size_bytes: number;
+  uploaded_at: string;
+}
+
+export async function backupToB2(): Promise<BackupEntry> {
+  const { data } = await api.post("/admin/backup");
+  return data;
+}
+
+export async function listBackups(): Promise<BackupEntry[]> {
+  const { data } = await api.get("/admin/backups");
+  return data;
+}

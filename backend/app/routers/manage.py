@@ -1,8 +1,12 @@
 """System management endpoints: status checks and user CRUD."""
+import asyncio
+import gzip
 import io
 import json
+import os
 import zipfile
-from datetime import date as date_type
+from datetime import date as date_type, datetime, timezone
+from urllib.parse import unquote, urlparse
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import Response
@@ -305,3 +309,66 @@ def delete_user(
     db.delete(user)
     db.commit()
     return {"detail": "User deleted"}
+
+
+@router.post("/backup")
+async def backup_to_b2(
+    _user: dict = Depends(get_current_user),
+):
+    """Dump the database (including cover BLOBs) and upload as a gzipped SQL to B2."""
+    # Parse connection details from DATABASE_URL
+    # Format: mysql+pymysql://user:pass@host:port/dbname
+    raw = settings.database_url
+    parsed = urlparse("mysql://" + raw.split("://", 1)[1])
+    host = parsed.hostname or "localhost"
+    port = str(parsed.port or 3306)
+    user = unquote(parsed.username or "")
+    password = unquote(parsed.password or "")
+    db_name = parsed.path.lstrip("/")
+
+    env = {**os.environ, "MYSQL_PWD": password}
+    proc = await asyncio.create_subprocess_exec(
+        "mysqldump",
+        "-h", host,
+        f"-P{port}",
+        f"-u{user}",
+        "--single-transaction",
+        "--routines",
+        "--triggers",
+        db_name,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        env=env,
+    )
+    stdout, stderr = await proc.communicate()
+
+    if proc.returncode != 0:
+        raise HTTPException(
+            status_code=500,
+            detail=f"mysqldump failed: {stderr.decode()[:500]}",
+        )
+
+    compressed = gzip.compress(stdout, compresslevel=6)
+
+    ts = datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H-%M-%S")
+    b2_key = f"backups/books-{ts}.sql.gz"
+
+    b2_service.upload_bytes(compressed, b2_key, content_type="application/gzip")
+
+    return {
+        "b2_key": b2_key,
+        "filename": f"books-{ts}.sql.gz",
+        "size_bytes": len(compressed),
+        "uploaded_at": datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+
+
+@router.get("/backups")
+def list_backups(
+    _user: dict = Depends(get_current_user),
+):
+    """List database backups stored in B2 under the backups/ prefix."""
+    try:
+        return b2_service.list_files("backups/")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
