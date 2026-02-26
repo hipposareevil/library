@@ -3,7 +3,7 @@ import { Navigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Header from "../components/layout/Header";
 import { useAuth } from "../context/AuthContext";
-import { fetchSystemStatus, exportData, importData } from "../api/manage";
+import { fetchSystemStatus, exportData, importData, backupToB2, listBackups, type BackupEntry } from "../api/manage";
 
 export default function ManagePage() {
   const { isAuthenticated } = useAuth();
@@ -20,12 +20,36 @@ export default function ManagePage() {
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState("");
 
+  // Backup state
+  const [backing, setBacking] = useState(false);
+  const [backupResult, setBackupResult] = useState<BackupEntry | null>(null);
+  const [backupError, setBackupError] = useState("");
+  const { data: backups, refetch: refetchBackups } = useQuery({
+    queryKey: ["backups"],
+    queryFn: listBackups,
+  });
+
   // Import state
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState("");
   const [importError, setImportError] = useState("");
   const importInputRef = useRef<HTMLInputElement>(null);
+
+  const handleBackup = async () => {
+    setBackupError("");
+    setBackupResult(null);
+    setBacking(true);
+    try {
+      const result = await backupToB2();
+      setBackupResult(result);
+      refetchBackups();
+    } catch {
+      setBackupError("Backup failed. Check B2 credentials and try again.");
+    } finally {
+      setBacking(false);
+    }
+  };
 
   const handleExport = async () => {
     setExportError("");
@@ -55,6 +79,19 @@ export default function ManagePage() {
     } finally {
       setImporting(false);
     }
+  };
+
+  const formatBytes = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const formatDate = (iso: string) => {
+    return new Date(iso).toLocaleString(undefined, {
+      year: "numeric", month: "short", day: "numeric",
+      hour: "2-digit", minute: "2-digit",
+    });
   };
 
   if (!isAuthenticated) {
@@ -147,6 +184,54 @@ export default function ManagePage() {
                   </>
                 )}
               </div>
+            </div>
+          )}
+        </div>
+
+        {/* Database Backup */}
+        <div className="manage-section">
+          <h2>Database Backup</h2>
+          <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem", margin: "0 0 1rem" }}>
+            Dump the full database (including cover art) and upload as a compressed SQL file to B2.
+            EPUB files are already stored in B2 and are not included.
+          </p>
+          {backupError && <div className="form-error" style={{ marginBottom: "0.75rem" }}>{backupError}</div>}
+          {backupResult && (
+            <div className="form-success" style={{ marginBottom: "0.75rem" }}>
+              Backup complete: <strong>{backupResult.filename}</strong> ({formatBytes(backupResult.size_bytes)})
+            </div>
+          )}
+          <button
+            className="btn btn-primary"
+            onClick={handleBackup}
+            disabled={backing}
+          >
+            {backing ? "Backing up…" : "Backup to B2"}
+          </button>
+
+          {backups && backups.length > 0 && (
+            <div style={{ marginTop: "1.25rem" }}>
+              <h3 style={{ fontSize: "0.95rem", marginBottom: "0.5rem", color: "var(--text-secondary)" }}>
+                Recent Backups
+              </h3>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.875rem" }}>
+                <thead>
+                  <tr style={{ borderBottom: "1px solid var(--border)", textAlign: "left" }}>
+                    <th style={{ padding: "0.4rem 0.75rem 0.4rem 0", color: "var(--text-muted)", fontWeight: 500 }}>File</th>
+                    <th style={{ padding: "0.4rem 0.75rem", color: "var(--text-muted)", fontWeight: 500 }}>Size</th>
+                    <th style={{ padding: "0.4rem 0", color: "var(--text-muted)", fontWeight: 500 }}>Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {backups.map((b: BackupEntry) => (
+                    <tr key={b.b2_key} style={{ borderBottom: "1px solid var(--border)" }}>
+                      <td style={{ padding: "0.4rem 0.75rem 0.4rem 0", fontFamily: "monospace", fontSize: "0.8rem" }}>{b.filename}</td>
+                      <td style={{ padding: "0.4rem 0.75rem", color: "var(--text-secondary)" }}>{formatBytes(b.size_bytes)}</td>
+                      <td style={{ padding: "0.4rem 0", color: "var(--text-secondary)" }}>{formatDate(b.uploaded_at)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

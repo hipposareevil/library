@@ -57,3 +57,24 @@ def delete_file(b2_key: str) -> None:
     bucket = _get_bucket()
     file_version = bucket.get_file_info_by_name(b2_key)
     bucket.delete_file_version(file_version.id_, file_version.file_name)
+
+
+def list_files(prefix: str = "") -> list[dict]:
+    """List files in the bucket under the given prefix, newest first."""
+    from datetime import datetime, timezone
+
+    bucket = _get_bucket()
+    results = []
+    for file_version, _folder_name in bucket.ls(folder_to_list=prefix, recursive=True):
+        if file_version is None:
+            continue
+        uploaded_at = datetime.fromtimestamp(
+            file_version.upload_timestamp / 1000, tz=timezone.utc
+        ).strftime("%Y-%m-%dT%H:%M:%SZ")
+        results.append({
+            "b2_key": file_version.file_name,
+            "filename": file_version.file_name.split("/")[-1],
+            "size_bytes": file_version.size,
+            "uploaded_at": uploaded_at,
+        })
+    return sorted(results, key=lambda x: x["uploaded_at"], reverse=True)
