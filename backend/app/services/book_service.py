@@ -30,6 +30,7 @@ def set_book_tags(db: Session, book: Book, tag_names: list[str]) -> None:
 def search_books(
     db: Session,
     q: str | None = None,
+    author: str | None = None,
     tags: list[str] | None = None,
     year_from: int | None = None,
     year_to: int | None = None,
@@ -46,6 +47,9 @@ def search_books(
         query = query.filter(
             text("MATCH(title, author, description) AGAINST(:q IN BOOLEAN MODE)")
         ).params(q=q)
+
+    if author:
+        query = query.filter(Book.author == author)
 
     if tags:
         for tag_name in tags:

@@ -13,10 +13,20 @@ export default function BookCard({ book }: BookCardProps) {
 
   return (
     <div className="book-card" onClick={() => navigate(`/book/${book.id}`)}>
-      <BookCover bookId={book.id} title={book.title} className="book-card-cover" />
+      <BookCover bookId={book.id} title={book.title} className="book-card-cover" thumb />
       <div className="book-card-info">
         <div className="book-card-title">{book.title}</div>
-        <div className="book-card-author">{book.author}</div>
+        {book.author && (
+          <div
+            className="book-card-author author-link"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/?author=${encodeURIComponent(book.author!)}`);
+            }}
+          >
+            {book.author}
+          </div>
+        )}
         <div className="book-card-meta">
           {year && <span>{year}</span>}
           {book.rating > 0 && <Stars rating={book.rating} />}

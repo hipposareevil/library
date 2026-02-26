@@ -36,10 +36,22 @@ export default function BookTable({ books, sort, order, onSort }: BookTableProps
           {books.map((book) => (
             <tr key={book.id} onClick={() => navigate(`/book/${book.id}`)}>
               <td>
-                <BookCover bookId={book.id} title={book.title} className="book-table-cover" />
+                <BookCover bookId={book.id} title={book.title} className="book-table-cover" thumb />
               </td>
               <td>{book.title}</td>
-              <td>{book.author}</td>
+              <td>
+                {book.author ? (
+                  <span
+                    className="author-link"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/?author=${encodeURIComponent(book.author!)}`);
+                    }}
+                  >
+                    {book.author}
+                  </span>
+                ) : ""}
+              </td>
               <td>
                 {book.publish_date
                   ? new Date(book.publish_date).getFullYear()

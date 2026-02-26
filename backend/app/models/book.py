@@ -4,7 +4,7 @@ from sqlalchemy import (
     Boolean, Column, Date, DateTime, Float, ForeignKey, Index, Integer,
     String, Text, UniqueConstraint,
 )
-from sqlalchemy.dialects.mysql import MEDIUMTEXT
+from sqlalchemy.dialects.mysql import MEDIUMBLOB, MEDIUMTEXT
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -47,7 +47,9 @@ class Book(Base):
     description = Column(MEDIUMTEXT, nullable=True)
     notes = Column(Text, nullable=True)
 
-    cover_key = Column(String(255), nullable=True)
+    cover_key = Column(String(255), nullable=True)   # legacy B2 key, no longer used
+    cover_data = Column(MEDIUMBLOB, nullable=True)    # full-size JPEG stored in DB
+    cover_thumb = Column(MEDIUMBLOB, nullable=True)   # thumbnail JPEG stored in DB
     epub_key = Column(String(255), nullable=True)
     has_epub = Column(Boolean, default=False)
 
