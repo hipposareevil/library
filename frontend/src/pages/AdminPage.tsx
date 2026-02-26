@@ -184,8 +184,8 @@ export default function AdminPage() {
     ? getCoverUrl(editingId)
     : null;
 
-  const resetForm = () => {
-    const dest = returnTo;
+  const resetForm = (savedId?: number) => {
+    const dest = savedId ?? returnTo ?? editingId;
     setShowForm(false);
     setEditingId(null);
     setReturnTo(null);
@@ -339,7 +339,7 @@ export default function AdminPage() {
       }
 
       queryClient.invalidateQueries({ queryKey: ["books"] });
-      resetForm();
+      resetForm(bookId);
     } catch {
       alert("Failed to save book");
     } finally {
@@ -357,7 +357,7 @@ export default function AdminPage() {
         <Header />
         <main className="container book-form-page">
           <div className="book-form-header">
-            <button type="button" className="btn btn-secondary btn-sm" onClick={resetForm}>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => resetForm()}>
               ← {returnTo ? "Back to Book" : "Back"}
             </button>
             <h1>{editingId ? "Edit Book" : "Add Book"}</h1>
@@ -511,7 +511,7 @@ export default function AdminPage() {
               </div>
 
               <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end", marginTop: "0.5rem" }}>
-                <button type="button" className="btn btn-secondary" onClick={resetForm}>
+                <button type="button" className="btn btn-secondary" onClick={() => resetForm()}>
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={saving}>

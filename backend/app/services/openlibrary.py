@@ -122,14 +122,10 @@ async def fetch_metadata_for_book(
         if subjects:
             result["subjects"] = subjects[:15]
 
-        # Cover URL: prefer cover_i (cover ID), fall back to ISBN
+        # Cover URL: only use cover_i (guaranteed to exist); ISBN URLs often 404
         cover_i = doc.get("cover_i")
         if cover_i:
             result["cover_url"] = f"https://covers.openlibrary.org/b/id/{cover_i}-L.jpg"
-        elif result.get("isbn"):
-            result["cover_url"] = f"https://covers.openlibrary.org/b/isbn/{result['isbn']}-L.jpg"
-        elif isbn:
-            result["cover_url"] = f"https://covers.openlibrary.org/b/isbn/{isbn}-L.jpg"
 
         # Fetch description from work record
         work_key = doc.get("key")

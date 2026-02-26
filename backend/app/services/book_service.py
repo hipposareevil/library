@@ -1,6 +1,6 @@
 from datetime import date
 
-from sqlalchemy import func, or_, text
+from sqlalchemy import func, text
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.book import Book, BookTag, Tag
@@ -44,12 +44,19 @@ def search_books(
     query = db.query(Book).options(joinedload(Book.tags))
 
     if q:
-        query = query.filter(
-            or_(
-                text("MATCH(title, author, description) AGAINST(:q IN BOOLEAN MODE)"),
-                text("CAST(publish_date AS CHAR) LIKE :date_q"),
-            )
-        ).params(q=q, date_q=f"%{q}%")
+        # MySQL FULLTEXT + OR doesn't work correctly when combined with the
+        # LEFT JOINs that joinedload generates. Pre-fetch matching IDs via two
+        # simple queries and filter the main query with IN() instead.
+        ft_ids = db.query(Book.id).filter(
+            text("MATCH(title, author, description) AGAINST(:q IN BOOLEAN MODE)").bindparams(q=q)
+        )
+        date_ids = db.query(Book.id).filter(
+            text("CAST(publish_date AS CHAR) LIKE :date_q").bindparams(date_q=f"%{q}%")
+        )
+        matched_ids = [row[0] for row in ft_ids.union(date_ids).all()]
+        if not matched_ids:
+            return [], 0
+        query = query.filter(Book.id.in_(matched_ids))
 
     if author:
         query = query.filter(Book.author == author)

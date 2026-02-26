@@ -189,15 +189,20 @@ async def upload_cover(
         cover_bytes = await file.read()
     elif cover_url:
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
                 resp = await client.get(cover_url)
                 resp.raise_for_status()
-                cover_bytes = resp.content
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Failed to fetch cover URL: {e}")
+                content_type = resp.headers.get("content-type", "")
+                if "image" in content_type and len(resp.content) > 1000:
+                    cover_bytes = resp.content
+        except Exception:
+            pass  # URL fetch failed — skip cover, don't fail the request
 
     if not cover_bytes:
-        raise HTTPException(status_code=400, detail="No cover provided")
+        # No file uploaded and no usable URL — nothing to do, return success
+        if file and file.filename:
+            raise HTTPException(status_code=400, detail="No cover provided")
+        return {"detail": "No cover to upload"}
 
     try:
         book.cover_data = _resize_cover(cover_bytes, 400, 600)
