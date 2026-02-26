@@ -232,6 +232,7 @@ export default function AdminPage() {
       let filled: string[] = [];
       setForm((prev) => {
         const next = { ...prev };
+
         const fill = (key: keyof Omit<BookFormData, "tags" | "rating">, val: unknown) => {
           if (val && !prev[key]) {
             (next as Record<string, unknown>)[key] = val;
