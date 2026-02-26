@@ -44,7 +44,7 @@ export default function BookDetailPage() {
       <Header />
       <main className="container detail-page">
         <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1rem" }}>
-          <Link to="/" className="btn btn-secondary btn-sm">&larr; Back</Link>
+          <button className="btn btn-secondary btn-sm" onClick={() => navigate(-1)}>&larr; Back</button>
           {isAuthenticated && (
             <button
               className="btn btn-secondary btn-sm"
