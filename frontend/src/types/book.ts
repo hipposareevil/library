@@ -47,6 +47,7 @@ export interface PaginatedBooks {
 
 export interface BookSearchParams {
   q?: string;
+  author?: string;
   tags?: string;
   year_from?: number;
   year_to?: number;

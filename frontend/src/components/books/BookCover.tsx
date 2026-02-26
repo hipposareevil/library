@@ -5,9 +5,10 @@ interface BookCoverProps {
   bookId: number;
   title: string;
   className?: string;
+  thumb?: boolean;
 }
 
-export default function BookCover({ bookId, title, className = "" }: BookCoverProps) {
+export default function BookCover({ bookId, title, className = "", thumb = false }: BookCoverProps) {
   const [error, setError] = useState(false);
 
   if (error) {
@@ -20,7 +21,7 @@ export default function BookCover({ bookId, title, className = "" }: BookCoverPr
 
   return (
     <img
-      src={getCoverUrl(bookId)}
+      src={getCoverUrl(bookId, thumb)}
       alt={title}
       className={className}
       loading="lazy"

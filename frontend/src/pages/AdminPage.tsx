@@ -1,5 +1,5 @@
 import { useState, useEffect, type FormEvent } from "react";
-import { Navigate, useLocation } from "react-router-dom";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import Header from "../components/layout/Header";
 import { useAuth } from "../context/AuthContext";
@@ -29,7 +29,7 @@ interface BookFormData {
   rating: number;
   series_name: string;
   series_index: string;
-  tags: string;
+  tags: string[];
 }
 
 const emptyForm: BookFormData = {
@@ -44,7 +44,7 @@ const emptyForm: BookFormData = {
   rating: 0,
   series_name: "",
   series_index: "",
-  tags: "",
+  tags: [],
 };
 
 // ── Star Rating ──────────────────────────────────────────────────────────────
@@ -71,16 +71,70 @@ function StarRating({ value, onChange }: { value: number; onChange: (v: number) 
   );
 }
 
+// ── Tag chips input ──────────────────────────────────────────────────────────
+function TagsInput({
+  tags,
+  onChange,
+}: {
+  tags: string[];
+  onChange: (tags: string[]) => void;
+}) {
+  const [input, setInput] = useState("");
+
+  const addTag = (raw: string) => {
+    const val = raw.trim().replace(/,+$/, "");
+    if (val && !tags.includes(val)) {
+      onChange([...tags, val]);
+    }
+    setInput("");
+  };
+
+  return (
+    <div className="tag-input-wrap">
+      {tags.map((t) => (
+        <span key={t} className="tag-chip">
+          {t}
+          <button
+            type="button"
+            className="tag-chip-remove"
+            onClick={() => onChange(tags.filter((x) => x !== t))}
+            aria-label={`Remove ${t}`}
+          >
+            &times;
+          </button>
+        </span>
+      ))}
+      <input
+        className="tag-chip-input"
+        placeholder={tags.length === 0 ? "Add tag…" : ""}
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === ",") {
+            e.preventDefault();
+            addTag(input);
+          } else if (e.key === "Backspace" && !input && tags.length > 0) {
+            onChange(tags.slice(0, -1));
+          }
+        }}
+        onBlur={() => { if (input.trim()) addTag(input); }}
+      />
+    </div>
+  );
+}
+
 // ── Main page ────────────────────────────────────────────────────────────────
 export default function AdminPage() {
   const { isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
   const location = useLocation();
+  const navigate = useNavigate();
   const [page, setPage] = useState(1);
   const { data } = useBooks({ page, per_page: 20, sort: "created_at", order: "desc" });
 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [returnTo, setReturnTo] = useState<number | null>(null);
   const [form, setForm] = useState<BookFormData>(emptyForm);
   const [epubFile, setEpubFile] = useState<File | null>(null);
   const [coverB64, setCoverB64] = useState<string | null>(null);
@@ -94,6 +148,7 @@ export default function AdminPage() {
   useEffect(() => {
     const editBook = (location.state as { editBook?: BookDetail })?.editBook;
     if (editBook && isAuthenticated) {
+      setReturnTo(editBook.id);
       setEditingId(editBook.id);
       setForm({
         title: editBook.title,
@@ -107,7 +162,7 @@ export default function AdminPage() {
         rating: editBook.rating,
         series_name: editBook.series_name || "",
         series_index: editBook.series_index?.toString() || "",
-        tags: editBook.tags.map((t) => t.name).join(", "),
+        tags: editBook.tags.map((t) => t.name),
       });
       setCoverB64(null);
       setCoverUrlInput("");
@@ -130,13 +185,18 @@ export default function AdminPage() {
     : null;
 
   const resetForm = () => {
+    const dest = returnTo;
     setShowForm(false);
     setEditingId(null);
+    setReturnTo(null);
     setForm(emptyForm);
     setEpubFile(null);
     setCoverB64(null);
     setCoverUrlInput("");
     setMetaFeedback("");
+    if (dest) {
+      navigate(`/book/${dest}`);
+    }
   };
 
   const handleEpubChange = async (file: File | null) => {
@@ -172,7 +232,7 @@ export default function AdminPage() {
       let filled: string[] = [];
       setForm((prev) => {
         const next = { ...prev };
-        const fill = (key: keyof typeof prev, val: unknown) => {
+        const fill = (key: keyof Omit<BookFormData, "tags" | "rating">, val: unknown) => {
           if (val && !prev[key]) {
             (next as Record<string, unknown>)[key] = val;
             filled.push(key);
@@ -185,8 +245,8 @@ export default function AdminPage() {
         fill("description", meta.description);
         fill("language", meta.language);
         fill("isbn", meta.isbn);
-        if (!prev.tags && Array.isArray(meta.subjects) && meta.subjects.length > 0) {
-          next.tags = (meta.subjects as string[]).join(", ");
+        if (!prev.tags.length && Array.isArray(meta.subjects) && meta.subjects.length > 0) {
+          next.tags = meta.subjects as string[];
           filled.push("tags");
         }
         return next;
@@ -210,6 +270,7 @@ export default function AdminPage() {
 
   const handleEdit = (book: BookListItem & { description?: string | null; notes?: string | null }) => {
     setEditingId(book.id);
+    setReturnTo(null);
     setForm({
       title: book.title,
       author: book.author || "",
@@ -222,7 +283,7 @@ export default function AdminPage() {
       rating: book.rating,
       series_name: book.series_name || "",
       series_index: book.series_index?.toString() || "",
-      tags: book.tags.map((t) => t.name).join(", "),
+      tags: book.tags.map((t) => t.name),
     });
     setCoverB64(null);
     setCoverUrlInput("");
@@ -252,7 +313,7 @@ export default function AdminPage() {
         rating: form.rating,
         series_name: form.series_name || null,
         series_index: form.series_index ? parseFloat(form.series_index) : null,
-        tags: form.tags.split(",").map((t) => t.trim()).filter(Boolean),
+        tags: form.tags,
       };
 
       let bookId: number;
@@ -297,7 +358,7 @@ export default function AdminPage() {
         <main className="container book-form-page">
           <div className="book-form-header">
             <button type="button" className="btn btn-secondary btn-sm" onClick={resetForm}>
-              ← Back
+              ← {returnTo ? "Back to Book" : "Back"}
             </button>
             <h1>{editingId ? "Edit Book" : "Add Book"}</h1>
             {editingId && (
@@ -419,8 +480,11 @@ export default function AdminPage() {
               </div>
 
               <div className="form-group">
-                <label>Tags (comma-separated)</label>
-                <input className="input" value={form.tags} onChange={(e) => setForm({ ...form, tags: e.target.value })} placeholder="Fiction, Science Fiction, Space" />
+                <label>Tags</label>
+                <TagsInput
+                  tags={form.tags}
+                  onChange={(tags) => setForm({ ...form, tags })}
+                />
               </div>
 
               <div className="form-group">
@@ -468,7 +532,7 @@ export default function AdminPage() {
       <main className="container" style={{ padding: "2rem 1.5rem" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
           <h1>Manage Books</h1>
-          <button className="btn btn-primary" onClick={() => { setForm(emptyForm); setCoverB64(null); setCoverUrlInput(""); setEpubFile(null); setEditingId(null); setShowForm(true); }}>
+          <button className="btn btn-primary" onClick={() => { setForm(emptyForm); setCoverB64(null); setCoverUrlInput(""); setEpubFile(null); setEditingId(null); setReturnTo(null); setShowForm(true); }}>
             + Add Book
           </button>
         </div>

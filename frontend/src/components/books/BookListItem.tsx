@@ -13,10 +13,20 @@ export default function BookListItemComponent({ book }: BookListItemProps) {
 
   return (
     <div className="book-list-item" onClick={() => navigate(`/book/${book.id}`)}>
-      <BookCover bookId={book.id} title={book.title} className="book-list-cover" />
+      <BookCover bookId={book.id} title={book.title} className="book-list-cover" thumb />
       <div className="book-list-info">
         <div className="book-list-title">{book.title}</div>
-        <div className="book-list-author">{book.author}</div>
+        {book.author && (
+          <div
+            className="book-list-author author-link"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/?author=${encodeURIComponent(book.author!)}`);
+            }}
+          >
+            {book.author}
+          </div>
+        )}
         <div className="book-list-tags">
           {book.tags.slice(0, 3).map((t) => (
             <span key={t.id} className="tag">{t.name}</span>

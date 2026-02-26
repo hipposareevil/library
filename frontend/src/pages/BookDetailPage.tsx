@@ -61,7 +61,14 @@ export default function BookDetailPage() {
           </div>
           <div>
             <h1 className="detail-title">{book.title}</h1>
-            <p className="detail-author">{book.author}</p>
+            {book.author && (
+              <p
+                className="detail-author author-link"
+                onClick={() => navigate(`/?author=${encodeURIComponent(book.author!)}`)}
+              >
+                {book.author}
+              </p>
+            )}
 
             <div className="detail-meta">
               {year && (

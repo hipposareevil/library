@@ -16,8 +16,8 @@ export async function fetchBookOverview(id: number): Promise<Record<string, unkn
   return data;
 }
 
-export function getCoverUrl(bookId: number): string {
-  return `/api/covers/${bookId}`;
+export function getCoverUrl(bookId: number, thumb = false): string {
+  return `/api/covers/${bookId}${thumb ? "?thumb=true" : ""}`;
 }
 
 export function getDownloadUrl(bookId: number): string {

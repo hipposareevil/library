@@ -15,6 +15,7 @@ router = APIRouter()
 @router.get("", response_model=PaginatedBooks)
 def list_books(
     q: str | None = None,
+    author: str | None = None,
     tags: str | None = Query(None, description="Comma-separated tag names"),
     year_from: int | None = None,
     year_to: int | None = None,
@@ -28,7 +29,7 @@ def list_books(
 ):
     tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else None
     books, total = search_books(
-        db, q=q, tags=tag_list, year_from=year_from, year_to=year_to,
+        db, q=q, author=author, tags=tag_list, year_from=year_from, year_to=year_to,
         rating_min=rating_min, has_epub=has_epub,
         sort=sort, order=order, page=page, per_page=per_page,
     )

@@ -140,10 +140,9 @@ async def upload_epub(
             if metadata.get(field) and not getattr(book, field, None):
                 setattr(book, field, metadata[field])
 
-        if cover_bytes and not book.cover_key:
-            cover_key = f"covers/{book.id}.jpg"
-            b2_service.upload_bytes(_resize_cover(cover_bytes), cover_key, content_type="image/jpeg")
-            book.cover_key = cover_key
+        if cover_bytes and not book.cover_data:
+            book.cover_data = _resize_cover(cover_bytes, 400, 600)
+            book.cover_thumb = _resize_cover(cover_bytes, 200, 300)
     except Exception:
         pass
 
@@ -201,19 +200,12 @@ async def upload_cover(
         raise HTTPException(status_code=400, detail="No cover provided")
 
     try:
-        cover_bytes = _resize_cover(cover_bytes)
+        book.cover_data = _resize_cover(cover_bytes, 400, 600)
+        book.cover_thumb = _resize_cover(cover_bytes, 200, 300)
     except Exception:
-        pass
+        book.cover_data = cover_bytes
+        book.cover_thumb = cover_bytes
 
-    if book.cover_key:
-        try:
-            b2_service.delete_file(book.cover_key)
-        except Exception:
-            pass
-
-    cover_key = f"covers/{book.id}.jpg"
-    b2_service.upload_bytes(cover_bytes, cover_key, content_type="image/jpeg")
-    book.cover_key = cover_key
     db.commit()
     return {"detail": "Cover uploaded"}
 
