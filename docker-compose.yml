@@ -3,9 +3,15 @@ version: "3.8"
 services:
   mariadb:
     image: mariadb:11
+    container_name: books-db
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
-      MYSQL_DATABASE: library
+      MYSQL_DATABASE: books
       MYSQL_USER: ${DB_USER}
       MYSQL_PASSWORD: ${DB_PASSWORD}
     volumes:
@@ -15,11 +21,19 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - books-network
 
   backend:
     build: ./backend
+    container_name: books-backend
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     environment:
-      DATABASE_URL: mysql+pymysql://${DB_USER}:${DB_PASSWORD}@mariadb:3306/library
+      DATABASE_URL: mysql+pymysql://${DB_USER}:${DB_PASSWORD}@mariadb:3306/books
       JWT_SECRET: ${JWT_SECRET}
       B2_KEY_ID: ${B2_KEY_ID}
       B2_APP_KEY: ${B2_APP_KEY}
@@ -31,24 +45,39 @@ services:
     depends_on:
       mariadb:
         condition: service_healthy
+    expose:
+      - "8000"
     command: >
       sh -c "alembic upgrade head &&
              python -m scripts.seed_admin &&
              uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    networks:
+      - books-network
+      - egress
 
   frontend:
     build: ./frontend
-    ports:
-      - "${FRONTEND_PORT:-80}:80"
+    container_name: books-web
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
     depends_on:
       - backend
+    expose:
+      - "80"
+    networks:
+      - books-network
+      - web
 
   import-worker:
     build: ./backend
+    container_name: books-import
     profiles:
       - import
     environment:
-      DATABASE_URL: mysql+pymysql://${DB_USER}:${DB_PASSWORD}@mariadb:3306/library
+      DATABASE_URL: mysql+pymysql://${DB_USER}:${DB_PASSWORD}@mariadb:3306/books
       B2_KEY_ID: ${B2_KEY_ID}
       B2_APP_KEY: ${B2_APP_KEY}
       B2_BUCKET_NAME: ${B2_BUCKET_NAME}
@@ -66,6 +95,18 @@ services:
              python -m scripts.upload_covers /data/opf /data/epub &&
              python -m scripts.upload_epubs /data/epub"
     restart: "no"
+    networks:
+      - books-network
+      - egress
 
 volumes:
   mariadb_data:
+
+networks:
+  books-network:
+    driver: bridge
+    internal: true
+  egress:
+    driver: bridge
+  web:
+    external: true
