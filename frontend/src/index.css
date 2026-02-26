@@ -465,8 +465,40 @@ a:hover {
   gap: 0.5rem;
 }
 
+.search-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-icon {
+  position: absolute;
+  left: 0.7rem;
+  width: 1rem;
+  height: 1rem;
+  color: var(--text-muted);
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
 .search-input {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  padding: 0.5rem 0.75rem 0.5rem 2.2rem;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color 0.2s;
   width: 280px;
+}
+
+.search-input:focus {
+  border-color: var(--accent);
+}
+
+.search-input::placeholder {
+  color: var(--text-muted);
 }
 
 /* ===== View Toggle ===== */
@@ -717,14 +749,15 @@ a:hover {
 /* ===== Book Detail ===== */
 
 .detail-page {
-  padding: 2rem 0;
+  padding: 2rem 2rem;
 }
 
 .detail-layout {
   display: grid;
   grid-template-columns: 300px 1fr;
-  gap: 2rem;
+  gap: 2.5rem;
   align-items: start;
+  max-width: 1000px;
 }
 
 .detail-cover {
