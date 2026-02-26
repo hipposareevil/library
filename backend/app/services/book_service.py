@@ -1,6 +1,6 @@
 from datetime import date
 
-from sqlalchemy import func, text
+from sqlalchemy import func, or_, text
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.book import Book, BookTag, Tag
@@ -45,8 +45,11 @@ def search_books(
 
     if q:
         query = query.filter(
-            text("MATCH(title, author, description) AGAINST(:q IN BOOLEAN MODE)")
-        ).params(q=q)
+            or_(
+                text("MATCH(title, author, description) AGAINST(:q IN BOOLEAN MODE)"),
+                text("CAST(publish_date AS CHAR) LIKE :date_q"),
+            )
+        ).params(q=q, date_q=f"%{q}%")
 
     if author:
         query = query.filter(Book.author == author)
