@@ -120,20 +120,6 @@ export default function HomePage() {
         <div className="toolbar">
           <div className="toolbar-left">
             <SearchBar value={params.q ?? ""} onChange={handleSearch} />
-            <select
-              className="select"
-              value={params.sort}
-              onChange={(e) => {
-                setParams((prev) => ({ ...prev, sort: e.target.value, page: 1 }));
-                setAllBooks([]);
-              }}
-            >
-              <option value="title_sort">Title</option>
-              <option value="author_sort">Author</option>
-              <option value="publish_date">Date</option>
-              <option value="rating">Rating</option>
-              <option value="created_at">Recently Added</option>
-            </select>
             <button
               className="btn btn-secondary btn-sm"
               onClick={() => {
