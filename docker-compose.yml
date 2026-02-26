@@ -99,6 +99,33 @@ services:
       - books-network
       - egress
 
+  import-meta:
+    build: ./backend
+    container_name: books-import-meta
+    profiles:
+      - import-meta
+    environment:
+      DATABASE_URL: mysql+pymysql://${DB_USER}:${DB_PASSWORD}@mariadb:3306/books
+      B2_KEY_ID: ${B2_KEY_ID}
+      B2_APP_KEY: ${B2_APP_KEY}
+      B2_BUCKET_NAME: ${B2_BUCKET_NAME}
+      B2_ENDPOINT: ${B2_ENDPOINT}
+    volumes:
+      - ./opf:/data/opf:ro
+      - ./epub:/data/epub:ro
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    command: >
+      sh -c "alembic upgrade head &&
+             python -m scripts.import_opf /data/opf &&
+             python -m scripts.import_epub /data/epub &&
+             python -m scripts.upload_covers /data/opf /data/epub"
+    restart: "no"
+    networks:
+      - books-network
+      - egress
+
 volumes:
   mariadb_data:
 
