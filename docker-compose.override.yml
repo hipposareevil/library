@@ -1,0 +1,13 @@
+version: "3.8"
+
+# Local development override — automatically merged by docker compose.
+# On Linode (behind nginx proxy), use: docker compose -f docker-compose.yml up -d
+
+services:
+  frontend:
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+
+networks:
+  web:
+    external: false
