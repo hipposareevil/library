@@ -388,6 +388,23 @@ def list_backups(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class DeleteBackupRequest(BaseModel):
+    b2_key: str
+
+
+@router.delete("/backup")
+def delete_backup(
+    body: DeleteBackupRequest,
+    _user: dict = Depends(get_current_user),
+):
+    """Delete a backup file from B2."""
+    try:
+        b2_service.delete_file(body.b2_key)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"detail": "Backup deleted"}
+
+
 @router.post("/restore")
 async def restore_from_b2(
     body: RestoreRequest,

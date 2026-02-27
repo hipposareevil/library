@@ -88,3 +88,8 @@ export async function restoreFromBackup(b2_key: string): Promise<{ detail: strin
   const { data } = await api.post("/admin/restore", { b2_key });
   return data;
 }
+
+export async function deleteBackup(b2_key: string): Promise<{ detail: string }> {
+  const { data } = await api.delete("/admin/backup", { data: { b2_key } });
+  return data;
+}
