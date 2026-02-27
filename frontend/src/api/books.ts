@@ -72,3 +72,8 @@ export async function fetchOpenLibraryMetadata(bookId: number): Promise<Record<s
   const { data } = await api.get(`/admin/books/${bookId}/fetch-metadata`);
   return data;
 }
+
+export async function toggleRead(bookId: number): Promise<{ id: number; read: boolean }> {
+  const { data } = await api.patch(`/admin/books/${bookId}/read`);
+  return data;
+}

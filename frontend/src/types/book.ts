@@ -18,6 +18,7 @@ export interface BookListItem {
   language: string | null;
   cover_key: string | null;
   has_epub: boolean;
+  read: boolean;
   rating: number;
   series_name: string | null;
   series_index: number | null;
