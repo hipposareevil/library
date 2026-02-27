@@ -38,8 +38,8 @@ export default function Header() {
 
         {/* ── Left: brand ── */}
         <Link to="/" className="hero-brand">
-          <img src="/android-chrome-192x192.png" alt="Library" className="hero-logo" />
-          <h1 className="hero-title">Library</h1>
+          <img src="/android-chrome-192x192.png" alt="Arcanum" className="hero-logo" />
+          <h1 className="hero-title">Arcanum</h1>
         </Link>
 
         {/* ── Right: palette + nav menus ── */}
@@ -76,14 +76,14 @@ export default function Header() {
                         <path d="M21 5v14c0 1.66-4.03 3-9 3s-9-1.34-9-3V5" />
                         <path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3" />
                       </svg>
-                      Databases
+                      System
                     </button>
                     <button className="dropdown-item" onClick={() => { navigate("/settings"); navMenu.setOpen(false); }}>
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                         <circle cx="12" cy="12" r="3" />
                         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
                       </svg>
-                      Settings
+                      Users
                     </button>
                     <div className="dropdown-divider" />
                     <button className="dropdown-item dropdown-item-danger" onClick={() => { logout(); navMenu.setOpen(false); }}>
