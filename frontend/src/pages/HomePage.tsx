@@ -23,8 +23,8 @@ export default function HomePage() {
   const [params, setParams] = useState<BookSearchParams>({
     page: 1,
     per_page: 24,
-    sort: "title_sort",
-    order: "asc",
+    sort: "publish_date",
+    order: "desc",
   });
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [allBooks, setAllBooks] = useState<BookListItem[]>([]);
@@ -140,19 +140,34 @@ export default function HomePage() {
         <div className="toolbar">
           <div className="toolbar-left">
             <SearchBar value={qParam ?? ""} onChange={handleSearch} />
-            <button
-              className="btn btn-secondary btn-sm"
-              onClick={() => {
-                setParams((prev) => ({
-                  ...prev,
-                  order: prev.order === "asc" ? "desc" : "asc",
-                  page: 1,
-                }));
-                setAllBooks([]);
-              }}
-            >
-              {params.order === "asc" ? "\u25B2 Asc" : "\u25BC Desc"}
-            </button>
+            <div className="sort-selector">
+              {([
+                { label: "Title",      field: "title_sort"  },
+                { label: "Date Added", field: "created_at"  },
+                { label: "Pub Date",   field: "publish_date"},
+              ] as { label: string; field: string }[]).map(({ label, field }) => (
+                <button
+                  key={field}
+                  className={`btn btn-sm ${params.sort === field ? "btn-primary" : "btn-secondary"}`}
+                  onClick={() => {
+                    setParams((prev) => ({
+                      ...prev,
+                      sort: field,
+                      order: prev.sort === field ? (prev.order === "asc" ? "desc" : "asc") : (field === "title_sort" ? "asc" : "desc"),
+                      page: 1,
+                    }));
+                    setAllBooks([]);
+                  }}
+                >
+                  {label}
+                  {params.sort === field && (
+                    <span style={{ marginLeft: "0.3em" }}>
+                      {params.order === "asc" ? "▲" : "▼"}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="toolbar-right">
             <span className="stats-bar">{total} books</span>

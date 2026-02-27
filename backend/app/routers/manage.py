@@ -15,6 +15,8 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from sqlalchemy import extract, or_
+
 from app.auth.dependencies import get_current_user
 from app.config import settings
 from app.database import get_db
@@ -23,6 +25,7 @@ from app.models.user import User
 from app.schemas.user import UserChangePassword, UserCreate, UserOut
 from app.services import b2_service
 from app.services.book_service import set_book_tags
+from app.services.openlibrary import fetch_metadata_for_book
 
 router = APIRouter()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -246,6 +249,56 @@ async def import_data(
 
     db.commit()
     return {"imported": imported, "total": len(books_data)}
+
+
+@router.post("/fix-publish-dates")
+async def fix_publish_dates(
+    db: Session = Depends(get_db),
+    _user: dict = Depends(get_current_user),
+):
+    """
+    Find books with missing or clearly-wrong publish dates (null or year < 1000)
+    and attempt to fill them in from OpenLibrary.
+    """
+    bad_books = (
+        db.query(Book)
+        .filter(
+            or_(
+                Book.publish_date.is_(None),
+                extract("year", Book.publish_date) < 1000,
+            )
+        )
+        .all()
+    )
+
+    checked = len(bad_books)
+    updated = 0
+    skipped = 0
+    errors = 0
+
+    for book in bad_books:
+        try:
+            meta = await fetch_metadata_for_book(book.isbn, book.title, book.author)
+            if meta and meta.get("publish_date"):
+                raw = meta["publish_date"]  # "YYYY-01-01"
+                parts = raw.split("-")
+                year = int(parts[0])
+                if 1000 <= year <= date_type.today().year + 1:
+                    month = int(parts[1]) if len(parts) > 1 else 1
+                    day = int(parts[2]) if len(parts) > 2 else 1
+                    book.publish_date = date_type(year, max(1, min(12, month)), max(1, min(28, day)))
+                    updated += 1
+                else:
+                    skipped += 1
+            else:
+                skipped += 1
+        except Exception:
+            errors += 1
+        # Be polite to OpenLibrary
+        await asyncio.sleep(0.3)
+
+    db.commit()
+    return {"checked": checked, "updated": updated, "skipped": skipped, "errors": errors}
 
 
 @router.get("/users", response_model=list[UserOut])
