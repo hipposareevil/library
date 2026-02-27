@@ -29,12 +29,18 @@ def upload_file(local_path: str, b2_key: str, content_type: str = "application/o
     return file_info.id_
 
 
-def upload_bytes(data: bytes, b2_key: str, content_type: str = "application/octet-stream") -> str:
+def upload_bytes(
+    data: bytes,
+    b2_key: str,
+    content_type: str = "application/octet-stream",
+    file_infos: dict | None = None,
+) -> str:
     bucket = _get_bucket()
     file_info = bucket.upload_bytes(
         data_bytes=data,
         file_name=b2_key,
         content_type=content_type,
+        file_infos=file_infos or {},
     )
     return file_info.id_
 
@@ -71,10 +77,12 @@ def list_files(prefix: str = "") -> list[dict]:
         uploaded_at = datetime.fromtimestamp(
             file_version.upload_timestamp / 1000, tz=timezone.utc
         ).strftime("%Y-%m-%dT%H:%M:%SZ")
+        fi = file_version.file_info or {}
         results.append({
             "b2_key": file_version.file_name,
             "filename": file_version.file_name.split("/")[-1],
             "size_bytes": file_version.size,
             "uploaded_at": uploaded_at,
+            "book_count": int(fi.get("book_count", 0)),
         })
     return sorted(results, key=lambda x: x["uploaded_at"], reverse=True)

@@ -8,9 +8,10 @@ import zipfile
 from datetime import date as date_type, datetime, timezone
 from urllib.parse import unquote, urlparse
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Body, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import Response
 from passlib.context import CryptContext
+from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -311,8 +312,13 @@ def delete_user(
     return {"detail": "User deleted"}
 
 
+class RestoreRequest(BaseModel):
+    b2_key: str
+
+
 @router.post("/backup")
 async def backup_to_b2(
+    db: Session = Depends(get_db),
     _user: dict = Depends(get_current_user),
 ):
     """Dump the database (including cover BLOBs) and upload as a gzipped SQL to B2."""
@@ -350,16 +356,24 @@ async def backup_to_b2(
 
     compressed = gzip.compress(stdout, compresslevel=6)
 
+    book_count = db.query(Book).count()
     ts = datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H-%M-%S")
     b2_key = f"backups/books-{ts}.sql.gz"
+    uploaded_at = datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    b2_service.upload_bytes(compressed, b2_key, content_type="application/gzip")
+    b2_service.upload_bytes(
+        compressed,
+        b2_key,
+        content_type="application/gzip",
+        file_infos={"book_count": str(book_count)},
+    )
 
     return {
         "b2_key": b2_key,
         "filename": f"books-{ts}.sql.gz",
         "size_bytes": len(compressed),
-        "uploaded_at": datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "uploaded_at": uploaded_at,
+        "book_count": book_count,
     }
 
 
@@ -372,3 +386,49 @@ def list_backups(
         return b2_service.list_files("backups/")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/restore")
+async def restore_from_b2(
+    body: RestoreRequest,
+    _user: dict = Depends(get_current_user),
+):
+    """Download a backup from B2 and restore it to the database."""
+    # Parse DB connection details
+    raw = settings.database_url
+    parsed = urlparse("mysql://" + raw.split("://", 1)[1])
+    host = parsed.hostname or "localhost"
+    port = str(parsed.port or 3306)
+    user = unquote(parsed.username or "")
+    password = unquote(parsed.password or "")
+    db_name = parsed.path.lstrip("/")
+
+    # Download and decompress
+    try:
+        compressed = b2_service.download_bytes(body.b2_key)
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Backup not found: {e}")
+
+    sql = gzip.decompress(compressed)
+
+    env = {**os.environ, "MYSQL_PWD": password}
+    proc = await asyncio.create_subprocess_exec(
+        "mysql",
+        "-h", host,
+        f"-P{port}",
+        f"-u{user}",
+        db_name,
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        env=env,
+    )
+    _, stderr = await proc.communicate(input=sql)
+
+    if proc.returncode != 0:
+        raise HTTPException(
+            status_code=500,
+            detail=f"mysql restore failed: {stderr.decode()[:500]}",
+        )
+
+    return {"detail": "Restore complete"}
