@@ -93,3 +93,15 @@ export async function deleteBackup(b2_key: string): Promise<{ detail: string }> 
   const { data } = await api.delete("/admin/backup", { data: { b2_key } });
   return data;
 }
+
+export interface FixDatesResult {
+  checked: number;
+  updated: number;
+  skipped: number;
+  errors: number;
+}
+
+export async function fixPublishDates(): Promise<FixDatesResult> {
+  const { data } = await api.post("/admin/fix-publish-dates");
+  return data;
+}

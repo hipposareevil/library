@@ -3,7 +3,7 @@ import { Navigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Header from "../components/layout/Header";
 import { useAuth } from "../context/AuthContext";
-import { fetchSystemStatus, exportData, importData, backupToB2, listBackups, restoreFromBackup, deleteBackup, type BackupEntry } from "../api/manage";
+import { fetchSystemStatus, exportData, importData, backupToB2, listBackups, restoreFromBackup, deleteBackup, fixPublishDates, type BackupEntry, type FixDatesResult } from "../api/manage";
 
 export default function ManagePage() {
   const { isAuthenticated } = useAuth();
@@ -37,6 +37,11 @@ export default function ManagePage() {
   // Delete backup state
   const [deletingKey, setDeletingKey] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState("");
+
+  // Fix publish dates state
+  const [fixingDates, setFixingDates] = useState(false);
+  const [fixDatesResult, setFixDatesResult] = useState<FixDatesResult | null>(null);
+  const [fixDatesError, setFixDatesError] = useState("");
 
   // Import state
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -91,6 +96,20 @@ export default function ManagePage() {
       setDeleteError("Delete failed. Check backend logs.");
     } finally {
       setDeletingKey(null);
+    }
+  };
+
+  const handleFixDates = async () => {
+    setFixDatesError("");
+    setFixDatesResult(null);
+    setFixingDates(true);
+    try {
+      const result = await fixPublishDates();
+      setFixDatesResult(result);
+    } catch {
+      setFixDatesError("Fix failed. Check backend logs.");
+    } finally {
+      setFixingDates(false);
     }
   };
 
@@ -368,6 +387,28 @@ export default function ManagePage() {
                 style={{ marginTop: "0.5rem" }}
               >
                 {importing ? "Importing..." : "Import"}
+              </button>
+            </div>
+
+
+            <div className="data-card">
+              <h3>Fix Publication Dates</h3>
+              <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem", margin: "0 0 1rem" }}>
+                Find books with missing or invalid publication dates and update them from OpenLibrary.
+              </p>
+              {fixDatesError && <div className="form-error" style={{ marginBottom: "0.75rem" }}>{fixDatesError}</div>}
+              {fixDatesResult && (
+                <div className="form-success" style={{ marginBottom: "0.75rem" }}>
+                  Checked {fixDatesResult.checked} books — updated {fixDatesResult.updated}, skipped {fixDatesResult.skipped}
+                  {fixDatesResult.errors > 0 && `, ${fixDatesResult.errors} errors`}.
+                </div>
+              )}
+              <button
+                className="btn btn-primary"
+                onClick={handleFixDates}
+                disabled={fixingDates}
+              >
+                {fixingDates ? "Fixing…" : "Fix Dates"}
               </button>
             </div>
           </div>
