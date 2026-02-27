@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import DOMPurify from "dompurify";
 import Header from "../components/layout/Header";
@@ -14,6 +15,11 @@ export default function BookDetailPage() {
   const { data: book, isLoading } = useBook(bookId);
   const { data: overview } = useBookOverview(bookId, book?.isbn ?? null);
   const { isAuthenticated } = useAuth();
+
+  useEffect(() => {
+    if (book?.title) document.title = book.title;
+    return () => { document.title = "Arcanum"; };
+  }, [book?.title]);
 
   if (isLoading) {
     return (

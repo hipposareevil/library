@@ -430,57 +430,6 @@ export default function ManagePage() {
                 {importing ? "Importing..." : "Import"}
               </button>
             </div>
-
-
-            <div className="data-card">
-              <h3>Fix Publication Dates</h3>
-              <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem", margin: "0 0 1rem" }}>
-                Find books with missing or invalid publication dates and update them from OpenLibrary.
-              </p>
-              {fixDatesError && <div className="form-error" style={{ marginBottom: "0.75rem" }}>{fixDatesError}</div>}
-              {fixDatesJob && (
-                <div className={fixDatesJob.status === "error" ? "form-error" : "form-success"} style={{ marginBottom: "0.75rem" }}>
-                  {fixDatesJob.status === "running"
-                    ? `Running… checked ${fixDatesJob.checked}, updated ${fixDatesJob.updated}`
-                    : fixDatesJob.status === "error"
-                    ? `Error: ${fixDatesJob.error_msg ?? "unknown"}`
-                    : `Done — checked ${fixDatesJob.checked}, updated ${fixDatesJob.updated}, skipped ${fixDatesJob.skipped}${fixDatesJob.errors > 0 ? `, ${fixDatesJob.errors} errors` : ""}`
-                  }
-                </div>
-              )}
-              <button
-                className="btn btn-primary"
-                onClick={handleFixDates}
-                disabled={fixDatesJob?.status === "running"}
-              >
-                {fixDatesJob?.status === "running" ? "Running…" : "Fix Dates"}
-              </button>
-            </div>
-
-            <div className="data-card">
-              <h3>Fix Series Info</h3>
-              <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem", margin: "0 0 1rem" }}>
-                Find books with no series and look up series name &amp; position from Google Books.
-              </p>
-              {fixSeriesError && <div className="form-error" style={{ marginBottom: "0.75rem" }}>{fixSeriesError}</div>}
-              {fixSeriesJob && (
-                <div className={fixSeriesJob.status === "error" ? "form-error" : "form-success"} style={{ marginBottom: "0.75rem" }}>
-                  {fixSeriesJob.status === "running"
-                    ? `Running… checked ${fixSeriesJob.checked}, updated ${fixSeriesJob.updated}`
-                    : fixSeriesJob.status === "error"
-                    ? `Error: ${fixSeriesJob.error_msg ?? "unknown"}`
-                    : `Done — checked ${fixSeriesJob.checked}, updated ${fixSeriesJob.updated}, skipped ${fixSeriesJob.skipped}${fixSeriesJob.errors > 0 ? `, ${fixSeriesJob.errors} errors` : ""}`
-                  }
-                </div>
-              )}
-              <button
-                className="btn btn-primary"
-                onClick={handleFixSeries}
-                disabled={fixSeriesJob?.status === "running"}
-              >
-                {fixSeriesJob?.status === "running" ? "Running…" : "Fix Series"}
-              </button>
-            </div>
           </div>
         </div>
       </main>

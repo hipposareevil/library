@@ -45,6 +45,12 @@ export default function HomePage() {
     setAllBooks([]);
   }, [qParam, authorParam]);
 
+  // Update page title based on active author filter
+  useEffect(() => {
+    document.title = authorParam ? authorParam : "Arcanum";
+    return () => { document.title = "Arcanum"; };
+  }, [authorParam]);
+
   // Accumulate books: replace on page 1, append on subsequent pages
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
