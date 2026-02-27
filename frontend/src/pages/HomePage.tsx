@@ -26,6 +26,7 @@ export default function HomePage() {
     sort: "publish_date",
     order: "desc",
   });
+  const [epubOnly, setEpubOnly] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [allBooks, setAllBooks] = useState<BookListItem[]>([]);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -35,6 +36,7 @@ export default function HomePage() {
     q: qParam,
     tags: selectedTags.length > 0 ? selectedTags.join(",") : undefined,
     author: authorParam,
+    has_epub: epubOnly || undefined,
   });
   const { data: tags } = useTags();
 
@@ -176,12 +178,23 @@ export default function HomePage() {
             </div>
           </div>
           <div className="toolbar-right">
+            <button
+              className={`btn btn-sm ${epubOnly ? "btn-primary" : "btn-secondary"}`}
+              title="Show only books with EPUB"
+              onClick={() => {
+                setEpubOnly((prev) => !prev);
+                setParams((prev) => ({ ...prev, page: 1 }));
+                setAllBooks([]);
+              }}
+            >
+              &#128214; EPUB
+            </button>
             <span className="stats-bar">{total} books</span>
             <ViewToggle view={view} onChange={handleViewChange} />
           </div>
         </div>
 
-        {(authorParam || qParam || selectedTags.length > 0) && (
+        {(authorParam || qParam || selectedTags.length > 0 || epubOnly) && (
           <div className="filter-bar">
             <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>Filtering:</span>
             {qParam && (
@@ -194,18 +207,24 @@ export default function HomePage() {
                 Author: {authorParam} <span className="remove">&times;</span>
               </span>
             )}
+            {epubOnly && (
+              <span className="filter-tag" onClick={() => { setEpubOnly(false); setAllBooks([]); setParams((p) => ({ ...p, page: 1 })); }}>
+                EPUB only <span className="remove">&times;</span>
+              </span>
+            )}
             {selectedTags.map((t) => (
               <span key={t} className="filter-tag" onClick={() => handleTagClick(t)}>
                 {t} <span className="remove">&times;</span>
               </span>
             ))}
-            {[qParam, authorParam, ...selectedTags].filter(Boolean).length > 1 ? (
+            {[qParam, authorParam, epubOnly || null, ...selectedTags].filter(Boolean).length > 1 ? (
               <span
                 className="filter-tag"
                 onClick={() => {
                   clearSearch();
                   clearAuthor();
                   setSelectedTags([]);
+                  setEpubOnly(false);
                   setParams((prev) => ({ ...prev, page: 1 }));
                   setAllBooks([]);
                 }}
