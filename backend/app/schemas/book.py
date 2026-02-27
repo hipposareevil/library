@@ -21,6 +21,7 @@ class BookListItem(BaseModel):
     language: str | None = None
     cover_key: str | None = None
     has_epub: bool = False
+    read: bool = False
     rating: int = 0
     series_name: str | None = None
     series_index: float | None = None
@@ -74,6 +75,7 @@ class BookUpdate(BaseModel):
     language: str | None = None
     description: str | None = None
     notes: str | None = None
+    read: bool | None = None
     rating: int | None = None
     series_name: str | None = None
     series_index: float | None = None

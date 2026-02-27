@@ -52,6 +52,7 @@ class Book(Base):
     cover_thumb = Column(MEDIUMBLOB, nullable=True)   # thumbnail JPEG stored in DB
     epub_key = Column(String(255), nullable=True)
     has_epub = Column(Boolean, default=False)
+    read = Column(Boolean, default=False, nullable=False)
 
     rating = Column(Integer, default=0)  # 0-10 (Calibre scale)
     series_name = Column(String(255), nullable=True)

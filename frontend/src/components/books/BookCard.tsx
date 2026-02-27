@@ -31,6 +31,7 @@ export default function BookCard({ book }: BookCardProps) {
           {year && <span>{year}</span>}
           {book.rating > 0 && <Stars rating={book.rating} />}
           {book.has_epub && <span title="EPUB available">&#128214;</span>}
+          {book.read && <span className="read-badge" title="Read">✓</span>}
         </div>
       </div>
     </div>

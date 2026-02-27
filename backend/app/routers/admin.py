@@ -100,6 +100,21 @@ async def update_book(
     return book
 
 
+@router.patch("/books/{book_id}/read")
+async def set_read_status(
+    book_id: int,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(get_current_user),
+):
+    """Toggle or set the read/unread status of a book."""
+    book = db.query(Book).filter(Book.id == book_id).first()
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+    book.read = not book.read
+    db.commit()
+    return {"id": book.id, "read": book.read}
+
+
 @router.delete("/books/{book_id}")
 async def delete_book(
     book_id: int,

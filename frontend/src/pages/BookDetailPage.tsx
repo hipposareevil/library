@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import DOMPurify from "dompurify";
 import Header from "../components/layout/Header";
@@ -6,7 +6,7 @@ import BookCover from "../components/books/BookCover";
 import Stars from "../components/books/Stars";
 import { useBook, useBookOverview } from "../hooks/useBooks";
 import { useAuth } from "../context/AuthContext";
-import { getDownloadUrl } from "../api/books";
+import { getDownloadUrl, toggleRead } from "../api/books";
 
 export default function BookDetailPage() {
   const { id } = useParams();
@@ -15,6 +15,19 @@ export default function BookDetailPage() {
   const { data: book, isLoading } = useBook(bookId);
   const { data: overview } = useBookOverview(bookId, book?.isbn ?? null);
   const { isAuthenticated } = useAuth();
+  const [read, setRead] = useState<boolean | null>(null);
+
+  // Sync local read state when book loads
+  useEffect(() => {
+    if (book) setRead(book.read);
+  }, [book?.read]);
+
+  const handleToggleRead = async () => {
+    try {
+      const result = await toggleRead(bookId);
+      setRead(result.read);
+    } catch { /* ignore */ }
+  };
 
   useEffect(() => {
     if (book?.title) document.title = book.title;
@@ -49,15 +62,24 @@ export default function BookDetailPage() {
     <>
       <Header />
       <main className="container detail-page">
-        <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1rem" }}>
+        <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1rem", alignItems: "center" }}>
           <button className="btn btn-secondary btn-sm" onClick={() => navigate(-1)}>&larr; Back</button>
           {isAuthenticated && (
-            <button
-              className="btn btn-secondary btn-sm"
-              onClick={() => navigate("/admin", { state: { editBook: book } })}
-            >
-              Edit
-            </button>
+            <>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => navigate("/admin", { state: { editBook: book } })}
+              >
+                Edit
+              </button>
+              <button
+                className={`btn btn-sm ${read ? "btn-primary" : "btn-secondary"}`}
+                onClick={handleToggleRead}
+                title={read ? "Mark as unread" : "Mark as read"}
+              >
+                {read ? "✓ Read" : "Unread"}
+              </button>
+            </>
           )}
         </div>
 

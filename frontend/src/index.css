@@ -603,6 +603,12 @@ a:hover {
   color: var(--text-muted);
 }
 
+.read-badge {
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 0.75rem;
+}
+
 /* ===== Book List ===== */
 
 .book-list {
