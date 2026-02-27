@@ -178,31 +178,28 @@ export default function HomePage() {
                   )}
                 </button>
               ))}
+            </div>
+            <div className="sort-selector">
               <button
-                className={`btn btn-sm ${readFilter !== null ? "btn-primary" : "btn-secondary"}`}
-                title="Filter by read status"
-                onClick={() => {
-                  setReadFilter((prev) => prev === null ? true : prev === true ? false : null);
-                  setParams((prev) => ({ ...prev, page: 1 }));
-                  setAllBooks([]);
-                }}
-              >
-                {readFilter === null ? "All" : readFilter ? "✓ Read" : "Unread"}
-              </button>
+                className={`btn btn-sm ${readFilter === null ? "btn-primary" : "btn-secondary"}`}
+                onClick={() => { setReadFilter(null); setParams((p) => ({ ...p, page: 1 })); setAllBooks([]); }}
+              >All</button>
+              <button
+                className={`btn btn-sm ${readFilter === true ? "btn-primary" : "btn-secondary"}`}
+                onClick={() => { setReadFilter(true); setParams((p) => ({ ...p, page: 1 })); setAllBooks([]); }}
+              >✓ Read</button>
+              <button
+                className={`btn btn-sm ${readFilter === false ? "btn-primary" : "btn-secondary"}`}
+                onClick={() => { setReadFilter(false); setParams((p) => ({ ...p, page: 1 })); setAllBooks([]); }}
+              >Unread</button>
+              <button
+                className={`btn btn-sm ${epubOnly ? "btn-primary" : "btn-secondary"}`}
+                title="Show only books with EPUB"
+                onClick={() => { setEpubOnly((prev) => !prev); setParams((prev) => ({ ...prev, page: 1 })); setAllBooks([]); }}
+              >&#128214; EPUB</button>
             </div>
           </div>
           <div className="toolbar-right">
-            <button
-              className={`btn btn-sm ${epubOnly ? "btn-primary" : "btn-secondary"}`}
-              title="Show only books with EPUB"
-              onClick={() => {
-                setEpubOnly((prev) => !prev);
-                setParams((prev) => ({ ...prev, page: 1 }));
-                setAllBooks([]);
-              }}
-            >
-              &#128214; EPUB
-            </button>
             <span className="stats-bar">{total} books</span>
             <ViewToggle view={view} onChange={handleViewChange} />
           </div>
