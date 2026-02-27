@@ -54,6 +54,7 @@ export interface BookSearchParams {
   year_to?: number;
   rating_min?: number;
   has_epub?: boolean;
+  read?: boolean;
   sort?: string;
   order?: "asc" | "desc";
   page?: number;

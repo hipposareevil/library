@@ -21,6 +21,7 @@ def list_books(
     year_to: int | None = None,
     rating_min: int | None = None,
     has_epub: bool | None = None,
+    read: bool | None = None,
     sort: str = "title_sort",
     order: str = "asc",
     page: int = Query(1, ge=1),
@@ -30,7 +31,7 @@ def list_books(
     tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else None
     books, total = search_books(
         db, q=q, author=author, tags=tag_list, year_from=year_from, year_to=year_to,
-        rating_min=rating_min, has_epub=has_epub,
+        rating_min=rating_min, has_epub=has_epub, read=read,
         sort=sort, order=order, page=page, per_page=per_page,
     )
     return PaginatedBooks(
