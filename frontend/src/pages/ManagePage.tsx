@@ -3,7 +3,7 @@ import { Navigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Header from "../components/layout/Header";
 import { useAuth } from "../context/AuthContext";
-import { fetchSystemStatus, exportData, importData, backupToB2, listBackups, restoreFromBackup, type BackupEntry } from "../api/manage";
+import { fetchSystemStatus, exportData, importData, backupToB2, listBackups, restoreFromBackup, deleteBackup, type BackupEntry } from "../api/manage";
 
 export default function ManagePage() {
   const { isAuthenticated } = useAuth();
@@ -33,6 +33,10 @@ export default function ManagePage() {
   const [restoringKey, setRestoringKey] = useState<string | null>(null);
   const [restoreResult, setRestoreResult] = useState("");
   const [restoreError, setRestoreError] = useState("");
+
+  // Delete backup state
+  const [deletingKey, setDeletingKey] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState("");
 
   // Import state
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -71,6 +75,22 @@ export default function ManagePage() {
       setRestoreError("Restore failed. Check backend logs.");
     } finally {
       setRestoringKey(null);
+    }
+  };
+
+  const handleDeleteBackup = async (entry: BackupEntry) => {
+    if (!window.confirm(
+      `Delete backup "${entry.filename}"?\n\nThis cannot be undone.`
+    )) return;
+    setDeleteError("");
+    setDeletingKey(entry.b2_key);
+    try {
+      await deleteBackup(entry.b2_key);
+      refetchBackups();
+    } catch {
+      setDeleteError("Delete failed. Check backend logs.");
+    } finally {
+      setDeletingKey(null);
     }
   };
 
@@ -234,6 +254,7 @@ export default function ManagePage() {
 
           {restoreResult && <div className="form-success" style={{ marginTop: "0.75rem" }}>{restoreResult}</div>}
           {restoreError && <div className="form-error" style={{ marginTop: "0.75rem" }}>{restoreError}</div>}
+          {deleteError && <div className="form-error" style={{ marginTop: "0.75rem" }}>{deleteError}</div>}
 
           {backups && backups.length > 0 && (
             <div style={{ marginTop: "1.25rem" }}>
@@ -257,13 +278,20 @@ export default function ManagePage() {
                       <td style={{ padding: "0.4rem 0.5rem", color: "var(--text-secondary)" }}>{b.book_count || "—"}</td>
                       <td style={{ padding: "0.4rem 0.5rem", color: "var(--text-secondary)" }}>{formatBytes(b.size_bytes)}</td>
                       <td style={{ padding: "0.4rem 0.5rem", color: "var(--text-secondary)" }}>{formatDate(b.uploaded_at)}</td>
-                      <td style={{ padding: "0.4rem 0" }}>
+                      <td style={{ padding: "0.4rem 0", display: "flex", gap: "0.4rem" }}>
                         <button
                           className="btn btn-secondary btn-sm"
                           onClick={() => handleRestore(b)}
-                          disabled={restoringKey !== null}
+                          disabled={restoringKey !== null || deletingKey !== null}
                         >
                           {restoringKey === b.b2_key ? "Restoring…" : "Restore"}
+                        </button>
+                        <button
+                          className="btn btn-danger btn-sm"
+                          onClick={() => handleDeleteBackup(b)}
+                          disabled={restoringKey !== null || deletingKey !== null}
+                        >
+                          {deletingKey === b.b2_key ? "Deleting…" : "Delete"}
                         </button>
                       </td>
                     </tr>
