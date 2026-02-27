@@ -30,6 +30,7 @@ export default function HomePage() {
   // null = all, true = read only, false = unread only
   const [readFilter, setReadFilter] = useState<boolean | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [tagsExpanded, setTagsExpanded] = useState(true);
   const [allBooks, setAllBooks] = useState<BookListItem[]>([]);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
@@ -255,15 +256,33 @@ export default function HomePage() {
         )}
 
         {tags && tags.length > 0 && !selectedTags.length && !authorParam && !qParam && readFilter === null && (
-          <div style={{ display: "flex", gap: "0.3rem", flexWrap: "wrap", padding: "0.5rem 0" }}>
-            {tags
-              .filter((t) => t.count > 10)
-              .slice(0, 30)
-              .map((t) => (
-                <span key={t.id} className="tag" onClick={() => handleTagClick(t.name)}>
-                  {t.name} ({t.count})
-                </span>
-              ))}
+          <div className="tag-cloud-section">
+            <button
+              className="tag-cloud-toggle"
+              onClick={() => setTagsExpanded((v) => !v)}
+              aria-expanded={tagsExpanded}
+            >
+              <svg
+                width="14" height="14" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                style={{ transform: tagsExpanded ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.2s" }}
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+              Tags
+            </button>
+            {tagsExpanded && (
+              <div className="tag-cloud">
+                {tags
+                  .filter((t) => t.count > 10)
+                  .slice(0, 30)
+                  .map((t) => (
+                    <span key={t.id} className="tag" onClick={() => handleTagClick(t.name)}>
+                      {t.name} ({t.count})
+                    </span>
+                  ))}
+              </div>
+            )}
           </div>
         )}
 
