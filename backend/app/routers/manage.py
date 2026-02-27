@@ -4,30 +4,39 @@ import gzip
 import io
 import json
 import os
+import uuid
 import zipfile
 from datetime import date as date_type, datetime, timezone
 from urllib.parse import unquote, urlparse
 
-from fastapi import APIRouter, Body, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import Response
 from passlib.context import CryptContext
 from pydantic import BaseModel
-from sqlalchemy import text
+from sqlalchemy import extract, or_, text
 from sqlalchemy.orm import Session
-
-from sqlalchemy import extract, or_
 
 from app.auth.dependencies import get_current_user
 from app.config import settings
-from app.database import get_db
+from app.database import SessionLocal, get_db
 from app.models.book import Book
 from app.models.user import User
 from app.schemas.user import UserChangePassword, UserCreate, UserOut
 from app.services import b2_service
 from app.services.book_service import set_book_tags
+from app.services.google_books import fetch_series_info
 from app.services.openlibrary import fetch_metadata_for_book
 
 router = APIRouter()
+
+# ── In-memory job store for long-running background tasks ──────────────────
+_jobs: dict[str, dict] = {}
+
+
+def _new_job(kind: str) -> str:
+    job_id = f"{kind}-{uuid.uuid4().hex[:8]}"
+    _jobs[job_id] = {"status": "running", "checked": 0, "updated": 0, "skipped": 0, "errors": 0}
+    return job_id
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
@@ -251,54 +260,106 @@ async def import_data(
     return {"imported": imported, "total": len(books_data)}
 
 
+async def _bg_fix_dates(job_id: str) -> None:
+    """Background task: fill missing/invalid publish dates from OpenLibrary."""
+    job = _jobs[job_id]
+    db = SessionLocal()
+    try:
+        bad_books = (
+            db.query(Book)
+            .filter(or_(Book.publish_date.is_(None), extract("year", Book.publish_date) < 1000))
+            .all()
+        )
+        job["checked"] = len(bad_books)
+        for book in bad_books:
+            try:
+                meta = await fetch_metadata_for_book(book.isbn, book.title, book.author)
+                if meta and meta.get("publish_date"):
+                    raw = meta["publish_date"]
+                    parts = raw.split("-")
+                    year = int(parts[0])
+                    if 1000 <= year <= date_type.today().year + 1:
+                        month = int(parts[1]) if len(parts) > 1 else 1
+                        day = int(parts[2]) if len(parts) > 2 else 1
+                        book.publish_date = date_type(year, max(1, min(12, month)), max(1, min(28, day)))
+                        job["updated"] += 1
+                    else:
+                        job["skipped"] += 1
+                else:
+                    job["skipped"] += 1
+            except Exception:
+                job["errors"] += 1
+            await asyncio.sleep(0.3)
+        db.commit()
+        job["status"] = "done"
+    except Exception as e:
+        db.rollback()
+        job["status"] = "error"
+        job["error_msg"] = str(e)
+    finally:
+        db.close()
+
+
+async def _bg_fix_series(job_id: str) -> None:
+    """Background task: fill missing series info from Google Books."""
+    job = _jobs[job_id]
+    db = SessionLocal()
+    try:
+        books = db.query(Book).filter(Book.series_name.is_(None)).all()
+        job["checked"] = len(books)
+        for book in books:
+            try:
+                info = await fetch_series_info(book.isbn, book.title, book.author)
+                if info and (info.get("series_name") or info.get("series_index") is not None):
+                    if info.get("series_name"):
+                        book.series_name = info["series_name"]
+                    if info.get("series_index") is not None and book.series_index is None:
+                        book.series_index = info["series_index"]
+                    job["updated"] += 1
+                else:
+                    job["skipped"] += 1
+            except Exception:
+                job["errors"] += 1
+            await asyncio.sleep(0.3)
+        db.commit()
+        job["status"] = "done"
+    except Exception as e:
+        db.rollback()
+        job["status"] = "error"
+        job["error_msg"] = str(e)
+    finally:
+        db.close()
+
+
 @router.post("/fix-publish-dates")
 async def fix_publish_dates(
-    db: Session = Depends(get_db),
+    background_tasks: BackgroundTasks,
     _user: dict = Depends(get_current_user),
 ):
-    """
-    Find books with missing or clearly-wrong publish dates (null or year < 1000)
-    and attempt to fill them in from OpenLibrary.
-    """
-    bad_books = (
-        db.query(Book)
-        .filter(
-            or_(
-                Book.publish_date.is_(None),
-                extract("year", Book.publish_date) < 1000,
-            )
-        )
-        .all()
-    )
+    """Start a background job to fill missing/invalid publish dates from OpenLibrary."""
+    job_id = _new_job("dates")
+    background_tasks.add_task(_bg_fix_dates, job_id)
+    return {"job_id": job_id}
 
-    checked = len(bad_books)
-    updated = 0
-    skipped = 0
-    errors = 0
 
-    for book in bad_books:
-        try:
-            meta = await fetch_metadata_for_book(book.isbn, book.title, book.author)
-            if meta and meta.get("publish_date"):
-                raw = meta["publish_date"]  # "YYYY-01-01"
-                parts = raw.split("-")
-                year = int(parts[0])
-                if 1000 <= year <= date_type.today().year + 1:
-                    month = int(parts[1]) if len(parts) > 1 else 1
-                    day = int(parts[2]) if len(parts) > 2 else 1
-                    book.publish_date = date_type(year, max(1, min(12, month)), max(1, min(28, day)))
-                    updated += 1
-                else:
-                    skipped += 1
-            else:
-                skipped += 1
-        except Exception:
-            errors += 1
-        # Be polite to OpenLibrary
-        await asyncio.sleep(0.3)
+@router.post("/fix-series")
+async def fix_series(
+    background_tasks: BackgroundTasks,
+    _user: dict = Depends(get_current_user),
+):
+    """Start a background job to fill missing series info from Google Books."""
+    job_id = _new_job("series")
+    background_tasks.add_task(_bg_fix_series, job_id)
+    return {"job_id": job_id}
 
-    db.commit()
-    return {"checked": checked, "updated": updated, "skipped": skipped, "errors": errors}
+
+@router.get("/jobs/{job_id}")
+def get_job_status(job_id: str, _user: dict = Depends(get_current_user)):
+    """Poll the status of a background fix job."""
+    job = _jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
 
 
 @router.get("/users", response_model=list[UserOut])

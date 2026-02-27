@@ -94,14 +94,26 @@ export async function deleteBackup(b2_key: string): Promise<{ detail: string }> 
   return data;
 }
 
-export interface FixDatesResult {
+export interface JobStatus {
+  status: "running" | "done" | "error";
   checked: number;
   updated: number;
   skipped: number;
   errors: number;
+  error_msg?: string;
 }
 
-export async function fixPublishDates(): Promise<FixDatesResult> {
+export async function fixPublishDates(): Promise<{ job_id: string }> {
   const { data } = await api.post("/admin/fix-publish-dates");
+  return data;
+}
+
+export async function fixSeries(): Promise<{ job_id: string }> {
+  const { data } = await api.post("/admin/fix-series");
+  return data;
+}
+
+export async function pollJob(job_id: string): Promise<JobStatus> {
+  const { data } = await api.get(`/admin/jobs/${job_id}`);
   return data;
 }

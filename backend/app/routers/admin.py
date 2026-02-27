@@ -12,6 +12,7 @@ from app.models.book import Book
 from app.schemas.book import BookCreate, BookDetail, BookUpdate
 from app.services.book_service import set_book_tags
 from app.services import b2_service, epub_service
+from app.services.google_books import fetch_series_info
 from app.services.openlibrary import fetch_metadata_for_book
 
 router = APIRouter()
@@ -56,6 +57,18 @@ async def create_book(
 
     if data.tags:
         set_book_tags(db, book, data.tags)
+
+    # Auto-fill series from Google Books if not provided
+    if not book.series_name:
+        try:
+            series = await fetch_series_info(book.isbn, book.title, book.author)
+            if series:
+                if series.get("series_name"):
+                    book.series_name = series["series_name"]
+                if series.get("series_index") is not None and book.series_index is None:
+                    book.series_index = series["series_index"]
+        except Exception:
+            pass  # non-fatal
 
     db.commit()
     db.refresh(book)

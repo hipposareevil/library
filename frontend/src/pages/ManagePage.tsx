@@ -1,9 +1,9 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { Navigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Header from "../components/layout/Header";
 import { useAuth } from "../context/AuthContext";
-import { fetchSystemStatus, exportData, importData, backupToB2, listBackups, restoreFromBackup, deleteBackup, fixPublishDates, type BackupEntry, type FixDatesResult } from "../api/manage";
+import { fetchSystemStatus, exportData, importData, backupToB2, listBackups, restoreFromBackup, deleteBackup, fixPublishDates, fixSeries, pollJob, type BackupEntry, type JobStatus } from "../api/manage";
 
 export default function ManagePage() {
   const { isAuthenticated } = useAuth();
@@ -39,9 +39,40 @@ export default function ManagePage() {
   const [deleteError, setDeleteError] = useState("");
 
   // Fix publish dates state
-  const [fixingDates, setFixingDates] = useState(false);
-  const [fixDatesResult, setFixDatesResult] = useState<FixDatesResult | null>(null);
+  const [fixDatesJobId, setFixDatesJobId] = useState<string | null>(null);
+  const [fixDatesJob, setFixDatesJob] = useState<JobStatus | null>(null);
   const [fixDatesError, setFixDatesError] = useState("");
+
+  // Fix series state
+  const [fixSeriesJobId, setFixSeriesJobId] = useState<string | null>(null);
+  const [fixSeriesJob, setFixSeriesJob] = useState<JobStatus | null>(null);
+  const [fixSeriesError, setFixSeriesError] = useState("");
+
+  // Poll fix-dates job
+  useEffect(() => {
+    if (!fixDatesJobId) return;
+    const interval = setInterval(async () => {
+      try {
+        const job = await pollJob(fixDatesJobId);
+        setFixDatesJob(job);
+        if (job.status !== "running") clearInterval(interval);
+      } catch { clearInterval(interval); }
+    }, 1500);
+    return () => clearInterval(interval);
+  }, [fixDatesJobId]);
+
+  // Poll fix-series job
+  useEffect(() => {
+    if (!fixSeriesJobId) return;
+    const interval = setInterval(async () => {
+      try {
+        const job = await pollJob(fixSeriesJobId);
+        setFixSeriesJob(job);
+        if (job.status !== "running") clearInterval(interval);
+      } catch { clearInterval(interval); }
+    }, 1500);
+    return () => clearInterval(interval);
+  }, [fixSeriesJobId]);
 
   // Import state
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -101,15 +132,25 @@ export default function ManagePage() {
 
   const handleFixDates = async () => {
     setFixDatesError("");
-    setFixDatesResult(null);
-    setFixingDates(true);
+    setFixDatesJob(null);
+    setFixDatesJobId(null);
     try {
-      const result = await fixPublishDates();
-      setFixDatesResult(result);
+      const { job_id } = await fixPublishDates();
+      setFixDatesJobId(job_id);
     } catch {
-      setFixDatesError("Fix failed. Check backend logs.");
-    } finally {
-      setFixingDates(false);
+      setFixDatesError("Failed to start job. Check backend logs.");
+    }
+  };
+
+  const handleFixSeries = async () => {
+    setFixSeriesError("");
+    setFixSeriesJob(null);
+    setFixSeriesJobId(null);
+    try {
+      const { job_id } = await fixSeries();
+      setFixSeriesJobId(job_id);
+    } catch {
+      setFixSeriesError("Failed to start job. Check backend logs.");
     }
   };
 
@@ -397,18 +438,47 @@ export default function ManagePage() {
                 Find books with missing or invalid publication dates and update them from OpenLibrary.
               </p>
               {fixDatesError && <div className="form-error" style={{ marginBottom: "0.75rem" }}>{fixDatesError}</div>}
-              {fixDatesResult && (
-                <div className="form-success" style={{ marginBottom: "0.75rem" }}>
-                  Checked {fixDatesResult.checked} books — updated {fixDatesResult.updated}, skipped {fixDatesResult.skipped}
-                  {fixDatesResult.errors > 0 && `, ${fixDatesResult.errors} errors`}.
+              {fixDatesJob && (
+                <div className={fixDatesJob.status === "error" ? "form-error" : "form-success"} style={{ marginBottom: "0.75rem" }}>
+                  {fixDatesJob.status === "running"
+                    ? `Running… checked ${fixDatesJob.checked}, updated ${fixDatesJob.updated}`
+                    : fixDatesJob.status === "error"
+                    ? `Error: ${fixDatesJob.error_msg ?? "unknown"}`
+                    : `Done — checked ${fixDatesJob.checked}, updated ${fixDatesJob.updated}, skipped ${fixDatesJob.skipped}${fixDatesJob.errors > 0 ? `, ${fixDatesJob.errors} errors` : ""}`
+                  }
                 </div>
               )}
               <button
                 className="btn btn-primary"
                 onClick={handleFixDates}
-                disabled={fixingDates}
+                disabled={fixDatesJob?.status === "running"}
               >
-                {fixingDates ? "Fixing…" : "Fix Dates"}
+                {fixDatesJob?.status === "running" ? "Running…" : "Fix Dates"}
+              </button>
+            </div>
+
+            <div className="data-card">
+              <h3>Fix Series Info</h3>
+              <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem", margin: "0 0 1rem" }}>
+                Find books with no series and look up series name &amp; position from Google Books.
+              </p>
+              {fixSeriesError && <div className="form-error" style={{ marginBottom: "0.75rem" }}>{fixSeriesError}</div>}
+              {fixSeriesJob && (
+                <div className={fixSeriesJob.status === "error" ? "form-error" : "form-success"} style={{ marginBottom: "0.75rem" }}>
+                  {fixSeriesJob.status === "running"
+                    ? `Running… checked ${fixSeriesJob.checked}, updated ${fixSeriesJob.updated}`
+                    : fixSeriesJob.status === "error"
+                    ? `Error: ${fixSeriesJob.error_msg ?? "unknown"}`
+                    : `Done — checked ${fixSeriesJob.checked}, updated ${fixSeriesJob.updated}, skipped ${fixSeriesJob.skipped}${fixSeriesJob.errors > 0 ? `, ${fixSeriesJob.errors} errors` : ""}`
+                  }
+                </div>
+              )}
+              <button
+                className="btn btn-primary"
+                onClick={handleFixSeries}
+                disabled={fixSeriesJob?.status === "running"}
+              >
+                {fixSeriesJob?.status === "running" ? "Running…" : "Fix Series"}
               </button>
             </div>
           </div>
