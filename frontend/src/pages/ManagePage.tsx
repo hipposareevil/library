@@ -3,7 +3,7 @@ import { Navigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Header from "../components/layout/Header";
 import { useAuth } from "../context/AuthContext";
-import { fetchSystemStatus, exportData, importData, backupToB2, listBackups, type BackupEntry } from "../api/manage";
+import { fetchSystemStatus, exportData, importData, backupToB2, listBackups, restoreFromBackup, type BackupEntry } from "../api/manage";
 
 export default function ManagePage() {
   const { isAuthenticated } = useAuth();
@@ -29,6 +29,11 @@ export default function ManagePage() {
     queryFn: listBackups,
   });
 
+  // Restore state
+  const [restoringKey, setRestoringKey] = useState<string | null>(null);
+  const [restoreResult, setRestoreResult] = useState("");
+  const [restoreError, setRestoreError] = useState("");
+
   // Import state
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
@@ -48,6 +53,24 @@ export default function ManagePage() {
       setBackupError("Backup failed. Check B2 credentials and try again.");
     } finally {
       setBacking(false);
+    }
+  };
+
+  const handleRestore = async (entry: BackupEntry) => {
+    if (!window.confirm(
+      `Restore from "${entry.filename}"?\n\nThis will overwrite ALL current data (${entry.book_count} books) with the backup. This cannot be undone.`
+    )) return;
+    setRestoreError("");
+    setRestoreResult("");
+    setRestoringKey(entry.b2_key);
+    try {
+      await restoreFromBackup(entry.b2_key);
+      setRestoreResult(`Restored from ${entry.filename}.`);
+      queryClient.invalidateQueries({ queryKey: ["system-status"] });
+    } catch {
+      setRestoreError("Restore failed. Check backend logs.");
+    } finally {
+      setRestoringKey(null);
     }
   };
 
@@ -198,7 +221,7 @@ export default function ManagePage() {
           {backupError && <div className="form-error" style={{ marginBottom: "0.75rem" }}>{backupError}</div>}
           {backupResult && (
             <div className="form-success" style={{ marginBottom: "0.75rem" }}>
-              Backup complete: <strong>{backupResult.filename}</strong> ({formatBytes(backupResult.size_bytes)})
+              Backup complete: <strong>{backupResult.filename}</strong> — {backupResult.book_count} books, {formatBytes(backupResult.size_bytes)}
             </div>
           )}
           <button
@@ -209,6 +232,9 @@ export default function ManagePage() {
             {backing ? "Backing up…" : "Backup to B2"}
           </button>
 
+          {restoreResult && <div className="form-success" style={{ marginTop: "0.75rem" }}>{restoreResult}</div>}
+          {restoreError && <div className="form-error" style={{ marginTop: "0.75rem" }}>{restoreError}</div>}
+
           {backups && backups.length > 0 && (
             <div style={{ marginTop: "1.25rem" }}>
               <h3 style={{ fontSize: "0.95rem", marginBottom: "0.5rem", color: "var(--text-secondary)" }}>
@@ -218,16 +244,28 @@ export default function ManagePage() {
                 <thead>
                   <tr style={{ borderBottom: "1px solid var(--border)", textAlign: "left" }}>
                     <th style={{ padding: "0.4rem 0.75rem 0.4rem 0", color: "var(--text-muted)", fontWeight: 500 }}>File</th>
-                    <th style={{ padding: "0.4rem 0.75rem", color: "var(--text-muted)", fontWeight: 500 }}>Size</th>
-                    <th style={{ padding: "0.4rem 0", color: "var(--text-muted)", fontWeight: 500 }}>Date</th>
+                    <th style={{ padding: "0.4rem 0.5rem", color: "var(--text-muted)", fontWeight: 500 }}>Books</th>
+                    <th style={{ padding: "0.4rem 0.5rem", color: "var(--text-muted)", fontWeight: 500 }}>Size</th>
+                    <th style={{ padding: "0.4rem 0.5rem", color: "var(--text-muted)", fontWeight: 500 }}>Date</th>
+                    <th style={{ padding: "0.4rem 0", color: "var(--text-muted)", fontWeight: 500 }}></th>
                   </tr>
                 </thead>
                 <tbody>
                   {backups.map((b: BackupEntry) => (
                     <tr key={b.b2_key} style={{ borderBottom: "1px solid var(--border)" }}>
                       <td style={{ padding: "0.4rem 0.75rem 0.4rem 0", fontFamily: "monospace", fontSize: "0.8rem" }}>{b.filename}</td>
-                      <td style={{ padding: "0.4rem 0.75rem", color: "var(--text-secondary)" }}>{formatBytes(b.size_bytes)}</td>
-                      <td style={{ padding: "0.4rem 0", color: "var(--text-secondary)" }}>{formatDate(b.uploaded_at)}</td>
+                      <td style={{ padding: "0.4rem 0.5rem", color: "var(--text-secondary)" }}>{b.book_count || "—"}</td>
+                      <td style={{ padding: "0.4rem 0.5rem", color: "var(--text-secondary)" }}>{formatBytes(b.size_bytes)}</td>
+                      <td style={{ padding: "0.4rem 0.5rem", color: "var(--text-secondary)" }}>{formatDate(b.uploaded_at)}</td>
+                      <td style={{ padding: "0.4rem 0" }}>
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => handleRestore(b)}
+                          disabled={restoringKey !== null}
+                        >
+                          {restoringKey === b.b2_key ? "Restoring…" : "Restore"}
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

@@ -71,6 +71,7 @@ export interface BackupEntry {
   filename: string;
   size_bytes: number;
   uploaded_at: string;
+  book_count: number;
 }
 
 export async function backupToB2(): Promise<BackupEntry> {
@@ -80,5 +81,10 @@ export async function backupToB2(): Promise<BackupEntry> {
 
 export async function listBackups(): Promise<BackupEntry[]> {
   const { data } = await api.get("/admin/backups");
+  return data;
+}
+
+export async function restoreFromBackup(b2_key: string): Promise<{ detail: string }> {
+  const { data } = await api.post("/admin/restore", { b2_key });
   return data;
 }
