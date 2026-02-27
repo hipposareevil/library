@@ -111,17 +111,6 @@ export default function Header() {
             )}
           </div>
 
-          {/* Reviews link */}
-          <a
-            href="https://reviews.willprogramforfood.com/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hero-reviews-link"
-            title="Book Reviews"
-          >
-            <img src="/reviews-icon.jpg" alt="Book Reviews" />
-          </a>
-
           {/* Theme dropdown */}
           <div className="dropdown dropdown-right" ref={themeMenu.ref}>
             <button
@@ -166,6 +155,17 @@ export default function Header() {
               </div>
             )}
           </div>
+
+          {/* Reviews link */}
+          <a
+            href="https://reviews.willprogramforfood.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hero-reviews-link"
+            title="Book Reviews"
+          >
+            <img src="/reviews-icon.png" alt="Book Reviews" />
+          </a>
 
         </div>
       </div>
