@@ -27,6 +27,8 @@ export default function HomePage() {
     order: "desc",
   });
   const [epubOnly, setEpubOnly] = useState(false);
+  // null = all, true = read only, false = unread only
+  const [readFilter, setReadFilter] = useState<boolean | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [allBooks, setAllBooks] = useState<BookListItem[]>([]);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -37,6 +39,7 @@ export default function HomePage() {
     tags: selectedTags.length > 0 ? selectedTags.join(",") : undefined,
     author: authorParam,
     has_epub: epubOnly || undefined,
+    read: readFilter ?? undefined,
   });
   const { data: tags } = useTags();
 
@@ -150,9 +153,8 @@ export default function HomePage() {
             <SearchBar value={qParam ?? ""} onChange={handleSearch} />
             <div className="sort-selector">
               {([
-                { label: "Title",      field: "title_sort"  },
-                { label: "Date Added", field: "created_at"  },
                 { label: "Pub Date",   field: "publish_date"},
+                { label: "Date Added", field: "created_at"  },
               ] as { label: string; field: string }[]).map(({ label, field }) => (
                 <button
                   key={field}
@@ -161,7 +163,7 @@ export default function HomePage() {
                     setParams((prev) => ({
                       ...prev,
                       sort: field,
-                      order: prev.sort === field ? (prev.order === "asc" ? "desc" : "asc") : (field === "title_sort" ? "asc" : "desc"),
+                      order: prev.sort === field ? (prev.order === "asc" ? "desc" : "asc") : "desc",
                       page: 1,
                     }));
                     setAllBooks([]);
@@ -175,6 +177,17 @@ export default function HomePage() {
                   )}
                 </button>
               ))}
+              <button
+                className={`btn btn-sm ${readFilter !== null ? "btn-primary" : "btn-secondary"}`}
+                title="Filter by read status"
+                onClick={() => {
+                  setReadFilter((prev) => prev === null ? true : prev === true ? false : null);
+                  setParams((prev) => ({ ...prev, page: 1 }));
+                  setAllBooks([]);
+                }}
+              >
+                {readFilter === null ? "All" : readFilter ? "✓ Read" : "Unread"}
+              </button>
             </div>
           </div>
           <div className="toolbar-right">
@@ -194,7 +207,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        {(authorParam || qParam || selectedTags.length > 0 || epubOnly) && (
+        {(authorParam || qParam || selectedTags.length > 0 || epubOnly || readFilter !== null) && (
           <div className="filter-bar">
             <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>Filtering:</span>
             {qParam && (
@@ -212,12 +225,17 @@ export default function HomePage() {
                 EPUB only <span className="remove">&times;</span>
               </span>
             )}
+            {readFilter !== null && (
+              <span className="filter-tag" onClick={() => { setReadFilter(null); setAllBooks([]); setParams((p) => ({ ...p, page: 1 })); }}>
+                {readFilter ? "Read only" : "Unread only"} <span className="remove">&times;</span>
+              </span>
+            )}
             {selectedTags.map((t) => (
               <span key={t} className="filter-tag" onClick={() => handleTagClick(t)}>
                 {t} <span className="remove">&times;</span>
               </span>
             ))}
-            {[qParam, authorParam, epubOnly || null, ...selectedTags].filter(Boolean).length > 1 ? (
+            {[qParam, authorParam, epubOnly || null, readFilter !== null ? "read" : null, ...selectedTags].filter(Boolean).length > 1 ? (
               <span
                 className="filter-tag"
                 onClick={() => {
@@ -225,6 +243,7 @@ export default function HomePage() {
                   clearAuthor();
                   setSelectedTags([]);
                   setEpubOnly(false);
+                  setReadFilter(null);
                   setParams((prev) => ({ ...prev, page: 1 }));
                   setAllBooks([]);
                 }}
@@ -235,7 +254,7 @@ export default function HomePage() {
           </div>
         )}
 
-        {tags && tags.length > 0 && !selectedTags.length && !authorParam && !qParam && (
+        {tags && tags.length > 0 && !selectedTags.length && !authorParam && !qParam && readFilter === null && (
           <div style={{ display: "flex", gap: "0.3rem", flexWrap: "wrap", padding: "0.5rem 0" }}>
             {tags
               .filter((t) => t.count > 10)

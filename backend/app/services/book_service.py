@@ -36,6 +36,7 @@ def search_books(
     year_to: int | None = None,
     rating_min: int | None = None,
     has_epub: bool | None = None,
+    read: bool | None = None,
     sort: str = "title_sort",
     order: str = "asc",
     page: int = 1,
@@ -75,6 +76,8 @@ def search_books(
         query = query.filter(Book.rating >= rating_min)
     if has_epub is not None:
         query = query.filter(Book.has_epub == has_epub)
+    if read is not None:
+        query = query.filter(Book.read == read)
 
     # Count before pagination
     total = query.with_entities(func.count(Book.id)).scalar()
