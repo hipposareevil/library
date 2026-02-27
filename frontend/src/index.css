@@ -219,6 +219,7 @@ a:hover {
 }
 
 .hero-reviews-link {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -235,6 +236,30 @@ a:hover {
   border-radius: 8px;
   object-fit: cover;
   display: block;
+}
+.hero-reviews-link::after {
+  content: "Reviews";
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  box-shadow: 0 4px 12px var(--shadow);
+  z-index: 100;
+}
+.hero-reviews-link:hover::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
 }
 
 .hero-title {
