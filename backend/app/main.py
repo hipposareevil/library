@@ -1,8 +1,15 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.routers import auth, books, tags, admin, covers, manage
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%dT%H:%M:%S",
+)
 
 app = FastAPI(title="Library API", version="1.0.0")
 

@@ -1,5 +1,6 @@
 import html
 import io
+import logging
 import re
 import tempfile
 import zipfile
@@ -7,6 +8,8 @@ from html.parser import HTMLParser
 from xml.etree import ElementTree as ET
 
 from ebooklib import epub
+
+logger = logging.getLogger(__name__)
 
 
 class _StripHTML(HTMLParser):
@@ -44,10 +47,13 @@ def _clean_description(text: str | None) -> str | None:
 
 def extract_metadata(file_bytes: bytes) -> tuple[dict, bytes | None]:
     """Extract metadata and cover image from an EPUB file."""
+    logger.info("epub_service: writing %d bytes to tempfile", len(file_bytes))
     with tempfile.NamedTemporaryFile(suffix=".epub", delete=True) as tmp:
         tmp.write(file_bytes)
         tmp.flush()
+        logger.info("epub_service: reading epub from %s", tmp.name)
         book = epub.read_epub(tmp.name)
+    logger.info("epub_service: epub parsed ok")
 
     def get_first(field: str) -> str | None:
         values = book.get_metadata("DC", field)
@@ -78,8 +84,11 @@ def extract_metadata(file_bytes: bytes) -> tuple[dict, bytes | None]:
     if date_val:
         metadata["publish_date"] = date_val[:10]  # Just YYYY-MM-DD
 
+    logger.info("epub_service: metadata = %s", {k: v for k, v in metadata.items() if k != "description"})
+
     # Extract cover image
     cover_bytes = _extract_cover(book, file_bytes)
+    logger.info("epub_service: cover extraction %s", f"succeeded ({len(cover_bytes)} bytes)" if cover_bytes else "returned None")
 
     return metadata, cover_bytes
 
@@ -94,6 +103,7 @@ def _extract_cover(book: epub.EpubBook, file_bytes: bytes) -> bytes | None:
     for item in book.get_items():
         props = getattr(item, "properties", []) or []
         if "cover-image" in props:
+            logger.info("cover strategy 1 hit: %s", item.get_name())
             return item.get_content()
 
     # Strategy 2: image item whose id or filename contains "cover"
@@ -102,6 +112,7 @@ def _extract_cover(book: epub.EpubBook, file_bytes: bytes) -> bytes | None:
             item_id = (item.get_id() or "").lower()
             name = item.get_name().lower()
             if "cover" in item_id or "cover" in name:
+                logger.info("cover strategy 2 hit: %s", item.get_name())
                 return item.get_content()
 
     # Strategy 3: OPF meta name="cover" pointing to a manifest id
@@ -111,8 +122,10 @@ def _extract_cover(book: epub.EpubBook, file_bytes: bytes) -> bytes | None:
             cover_id = cover_meta[0][1].get("content", "")
             for item in book.get_items():
                 if item.get_id() == cover_id:
+                    logger.info("cover strategy 3 hit: id=%s name=%s", cover_id, item.get_name())
                     return item.get_content()
 
+    logger.info("cover strategies 1-3 missed, falling back to ZIP parsing")
     # Strategies 4-7: parse the EPUB zip directly
     try:
         with zipfile.ZipFile(io.BytesIO(file_bytes)) as zf:
@@ -198,7 +211,8 @@ def _extract_cover(book: epub.EpubBook, file_bytes: bytes) -> bytes | None:
             if images:
                 return zf.read(images[0])
 
-    except (zipfile.BadZipFile, ET.ParseError):
-        pass
+    except (zipfile.BadZipFile, ET.ParseError) as e:
+        logger.error("cover ZIP parsing failed: %s", e)
 
+    logger.warning("all cover strategies exhausted, returning None")
     return None

@@ -1,8 +1,11 @@
 import base64
 import io
+import logging
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+
+logger = logging.getLogger(__name__)
 from PIL import Image
 from sqlalchemy.orm import Session
 
@@ -155,24 +158,34 @@ async def upload_epub(
     file_bytes = await file.read()
 
     b2_key = f"epubs/{book.id}.epub"
+    logger.info("Uploading EPUB for book %d to B2 key %s (%d bytes)", book.id, b2_key, len(file_bytes))
     b2_service.upload_bytes(file_bytes, b2_key, content_type="application/epub+zip")
+    logger.info("B2 upload complete for book %d", book.id)
 
     book.epub_key = b2_key
     book.has_epub = True
 
     # Auto-extract metadata from the EPUB and fill in empty fields
     try:
+        logger.info("Extracting EPUB metadata for book %d", book.id)
         metadata, cover_bytes = epub_service.extract_metadata(file_bytes)
+        logger.info("EPUB metadata extracted for book %d: %s", book.id, {k: v for k, v in metadata.items() if k != "description"})
         fill_fields = ["title", "author", "publisher", "description", "language", "isbn", "publish_date"]
         for field in fill_fields:
             if metadata.get(field) and not getattr(book, field, None):
+                logger.info("  filling %s = %r", field, metadata[field][:80] if isinstance(metadata[field], str) else metadata[field])
                 setattr(book, field, metadata[field])
 
-        if cover_bytes and not book.cover_data:
-            book.cover_data = _resize_cover(cover_bytes, 400, 600)
-            book.cover_thumb = _resize_cover(cover_bytes, 200, 300)
+        if cover_bytes:
+            logger.info("Cover extracted (%d bytes) for book %d", len(cover_bytes), book.id)
+            if not book.cover_data:
+                book.cover_data = _resize_cover(cover_bytes, 400, 600)
+                book.cover_thumb = _resize_cover(cover_bytes, 200, 300)
+                logger.info("Cover stored for book %d", book.id)
+        else:
+            logger.warning("No cover found in EPUB for book %d", book.id)
     except Exception:
-        pass
+        logger.exception("EPUB metadata/cover extraction failed for book %d", book.id)
 
     db.commit()
     db.refresh(book)
@@ -185,17 +198,24 @@ async def extract_epub_metadata(
     _user: dict = Depends(get_current_user),
 ):
     file_bytes = await file.read()
+    logger.info("extract-epub: received %s (%d bytes)", file.filename, len(file_bytes))
     try:
         metadata, cover_bytes = epub_service.extract_metadata(file_bytes)
+        logger.info("extract-epub: metadata = %s", {k: v for k, v in metadata.items() if k != "description"})
     except Exception as e:
+        logger.exception("extract-epub: failed to parse EPUB %s", file.filename)
         raise HTTPException(status_code=400, detail=f"Failed to parse EPUB: {e}")
 
     cover_b64 = None
     if cover_bytes:
+        logger.info("extract-epub: cover found (%d bytes)", len(cover_bytes))
         try:
             cover_b64 = base64.b64encode(_resize_cover(cover_bytes, 300, 450)).decode()
         except Exception:
+            logger.exception("extract-epub: cover resize failed, using raw bytes")
             cover_b64 = base64.b64encode(cover_bytes).decode()
+    else:
+        logger.warning("extract-epub: no cover found in %s", file.filename)
 
     return {**metadata, "cover_b64": cover_b64}
 
