@@ -1,4 +1,4 @@
-import { useState, useEffect, type FormEvent } from "react";
+import { useState, useEffect, useRef, useCallback, type FormEvent } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import Header from "../components/layout/Header";
@@ -143,6 +143,19 @@ export default function AdminPage() {
   const [extracting, setExtracting] = useState(false);
   const [fetchingMeta, setFetchingMeta] = useState(false);
   const [metaFeedback, setMetaFeedback] = useState("");
+  const [coverDragOver, setCoverDragOver] = useState(false);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+
+  const handleCoverFile = useCallback((file: File) => {
+    if (!file.type.startsWith("image/")) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target?.result as string;
+      setCoverB64(result.split(",")[1]);
+      setCoverUrlInput("");
+    };
+    reader.readAsDataURL(file);
+  }, []);
 
   // Open edit form when navigated from BookDetailPage with state
   useEffect(() => {
@@ -394,9 +407,43 @@ export default function AdminPage() {
           <form onSubmit={handleSubmit} className="book-form-layout">
             {/* ── Left: cover ── */}
             <div className="book-form-cover-col">
-              <div className="cover-preview-box">
+              {/* Hidden file input for cover image */}
+              <input
+                ref={coverInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: "none" }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleCoverFile(file);
+                  e.target.value = "";
+                }}
+              />
+              <div
+                className={`cover-preview-box cover-preview-box--interactive${coverDragOver ? " cover-drag-over" : ""}`}
+                onDoubleClick={() => coverInputRef.current?.click()}
+                onDragOver={(e) => { e.preventDefault(); setCoverDragOver(true); }}
+                onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setCoverDragOver(false); }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setCoverDragOver(false);
+                  const file = e.dataTransfer.files[0];
+                  if (file) handleCoverFile(file);
+                }}
+                title="Double-click or drop an image to upload cover"
+              >
                 {coverPreview ? (
-                  <img src={coverPreview} alt="Cover" onError={() => setCoverUrlInput("")} />
+                  <>
+                    <img src={coverPreview} alt="Cover" onError={() => setCoverUrlInput("")} />
+                    <div className="cover-hover-overlay">
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: "0.4rem" }}>
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="17 8 12 3 7 8" />
+                        <line x1="12" y1="3" x2="12" y2="15" />
+                      </svg>
+                      Replace cover
+                    </div>
+                  </>
                 ) : (
                   <div className="cover-placeholder">
                     <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: "0.5rem", opacity: 0.4 }}>
@@ -405,6 +452,7 @@ export default function AdminPage() {
                       <polyline points="21 15 16 10 5 21" />
                     </svg>
                     <div>No cover</div>
+                    <div className="cover-upload-hint">double-click or drop image</div>
                   </div>
                 )}
               </div>
