@@ -30,7 +30,7 @@ export default function HomePage() {
   // null = all, true = read only, false = unread only
   const [readFilter, setReadFilter] = useState<boolean | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [tagsExpanded, setTagsExpanded] = useState(true);
+  const [tagsExpanded, setTagsExpanded] = useState(false);
   const [allBooks, setAllBooks] = useState<BookListItem[]>([]);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
