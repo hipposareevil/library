@@ -14,8 +14,19 @@ import {
   extractEpubMetadata,
   fetchOpenLibraryMetadata,
   getCoverUrl,
+  importEpubAsBook,
+  type ImportEpubResult,
 } from "../api/books";
 import type { BookListItem, BookDetail } from "../types/book";
+
+type ImportStatus = "pending" | "processing" | "done" | "error";
+interface ImportItem {
+  id: string;
+  filename: string;
+  status: ImportStatus;
+  result?: ImportEpubResult;
+  error?: string;
+}
 
 interface BookFormData {
   title: string;
@@ -145,6 +156,40 @@ export default function AdminPage() {
   const [metaFeedback, setMetaFeedback] = useState("");
   const [coverDragOver, setCoverDragOver] = useState(false);
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const [importItems, setImportItems] = useState<ImportItem[]>([]);
+  const [importDragOver, setImportDragOver] = useState(false);
+  const importInputRef = useRef<HTMLInputElement>(null);
+
+  const handleBulkImport = useCallback(async (files: File[]) => {
+    const epubs = files.filter((f) => f.name.toLowerCase().endsWith(".epub"));
+    if (!epubs.length) return;
+
+    const newItems: ImportItem[] = epubs.map((f) => ({
+      id: `${f.name}-${Date.now()}-${Math.random()}`,
+      filename: f.name,
+      status: "pending",
+    }));
+    setImportItems((prev) => [...prev, ...newItems]);
+
+    for (let i = 0; i < epubs.length; i++) {
+      const item = newItems[i];
+      setImportItems((prev) =>
+        prev.map((p) => (p.id === item.id ? { ...p, status: "processing" } : p))
+      );
+      try {
+        const result = await importEpubAsBook(epubs[i]);
+        setImportItems((prev) =>
+          prev.map((p) => (p.id === item.id ? { ...p, status: "done", result } : p))
+        );
+      } catch {
+        setImportItems((prev) =>
+          prev.map((p) => (p.id === item.id ? { ...p, status: "error", error: "Import failed" } : p))
+        );
+      }
+    }
+    queryClient.invalidateQueries({ queryKey: ["books"] });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleCoverFile = useCallback((file: File) => {
     if (!file.type.startsWith("image/")) return;
@@ -584,6 +629,107 @@ export default function AdminPage() {
             + Add Book
           </button>
         </div>
+
+        {/* ── Bulk EPUB import ── */}
+        <input
+          ref={importInputRef}
+          type="file"
+          accept=".epub"
+          multiple
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const files = Array.from(e.target.files || []);
+            if (files.length) handleBulkImport(files);
+            e.target.value = "";
+          }}
+        />
+        <div
+          className={`bulk-import-zone${importDragOver ? " bulk-import-drag-over" : ""}`}
+          onDoubleClick={() => importInputRef.current?.click()}
+          onDragOver={(e) => { e.preventDefault(); setImportDragOver(true); }}
+          onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setImportDragOver(false); }}
+          onDrop={(e) => {
+            e.preventDefault();
+            setImportDragOver(false);
+            handleBulkImport(Array.from(e.dataTransfer.files));
+          }}
+          onClick={() => importInputRef.current?.click()}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="17 8 12 3 7 8" />
+            <line x1="12" y1="3" x2="12" y2="15" />
+          </svg>
+          Drop EPUBs here or click to select
+        </div>
+
+        {importItems.length > 0 && (
+          <div className="import-results">
+            <div className="import-results-header">
+              <span>Import results</span>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => setImportItems([])}
+              >Clear</button>
+            </div>
+            {importItems.map((item) => (
+              <div key={item.id} className={`import-result-row import-result-${item.status}`}>
+                {/* Cover thumbnail / placeholder */}
+                {item.status === "done" && item.result ? (
+                  item.result.has_cover ? (
+                    <img
+                      src={getCoverUrl(item.result.book_id, true)}
+                      alt=""
+                      className="import-result-cover"
+                    />
+                  ) : (
+                    <div
+                      className="import-result-cover import-result-cover--empty"
+                      title="No cover — click to edit"
+                      onClick={() => navigate(`/book/${item.result!.book_id}`)}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                        <circle cx="8.5" cy="8.5" r="1.5" />
+                        <polyline points="21 15 16 10 5 21" />
+                      </svg>
+                    </div>
+                  )
+                ) : (
+                  <div className="import-result-cover import-result-cover--placeholder" />
+                )}
+
+                {/* Info */}
+                <div className="import-result-info">
+                  {item.status === "done" && item.result ? (
+                    <span
+                      className="import-result-title"
+                      onClick={() => navigate(`/book/${item.result!.book_id}`)}
+                    >
+                      {item.result.title}
+                    </span>
+                  ) : (
+                    <span className="import-result-title">{item.filename}</span>
+                  )}
+                  {item.result?.author && (
+                    <span className="import-result-author">{item.result.author}</span>
+                  )}
+                  {item.error && (
+                    <span className="import-result-error">{item.error}</span>
+                  )}
+                </div>
+
+                {/* Status badge */}
+                <span className={`import-badge import-badge--${item.status}`}>
+                  {item.status === "pending" && "Pending"}
+                  {item.status === "processing" && "…"}
+                  {item.status === "done" && (item.result?.has_cover ? "✓" : "✓ no cover")}
+                  {item.status === "error" && "✗"}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
 
         <div className="book-list">
           {books.map((book) => (
