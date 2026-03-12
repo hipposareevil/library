@@ -192,6 +192,62 @@ async def upload_epub(
     return {"detail": "EPUB uploaded", "epub_key": b2_key}
 
 
+@router.post("/books/import-epub")
+async def import_epub_as_book(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _user: dict = Depends(get_current_user),
+):
+    """Create a new book from an EPUB file, auto-extracting all metadata."""
+    logger.info("import-epub: processing %s", file.filename)
+    file_bytes = await file.read()
+
+    try:
+        metadata, cover_bytes = epub_service.extract_metadata(file_bytes)
+        logger.info("import-epub: metadata = %s", {k: v for k, v in metadata.items() if k != "description"})
+    except Exception as e:
+        logger.exception("import-epub: failed to parse %s", file.filename)
+        raise HTTPException(status_code=400, detail=f"Failed to parse EPUB: {e}")
+
+    title = metadata.get("title") or file.filename.replace(".epub", "")
+    book = Book(
+        title=title,
+        title_sort=title,
+        author=metadata.get("author"),
+        publisher=metadata.get("publisher"),
+        description=metadata.get("description"),
+        language=metadata.get("language") or "eng",
+        isbn=metadata.get("isbn"),
+        publish_date=metadata.get("publish_date"),
+        has_epub=True,
+    )
+    db.add(book)
+    db.flush()
+
+    b2_key = f"epubs/{book.id}.epub"
+    logger.info("import-epub: uploading to B2 key %s", b2_key)
+    b2_service.upload_bytes(file_bytes, b2_key, content_type="application/epub+zip")
+    book.epub_key = b2_key
+
+    if cover_bytes:
+        logger.info("import-epub: cover found (%d bytes)", len(cover_bytes))
+        book.cover_data = _resize_cover(cover_bytes, 400, 600)
+        book.cover_thumb = _resize_cover(cover_bytes, 200, 300)
+    else:
+        logger.warning("import-epub: no cover found for %s", file.filename)
+
+    db.commit()
+    db.refresh(book)
+    logger.info("import-epub: created book %d (%s)", book.id, book.title)
+
+    return {
+        "book_id": book.id,
+        "title": book.title,
+        "author": book.author,
+        "has_cover": bool(cover_bytes),
+    }
+
+
 @router.post("/books/extract-epub")
 async def extract_epub_metadata(
     file: UploadFile = File(...),

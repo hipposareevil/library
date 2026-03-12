@@ -77,3 +77,17 @@ export async function toggleRead(bookId: number): Promise<{ id: number; read: bo
   const { data } = await api.patch(`/admin/books/${bookId}/read`);
   return data;
 }
+
+export interface ImportEpubResult {
+  book_id: number;
+  title: string;
+  author: string | null;
+  has_cover: boolean;
+}
+
+export async function importEpubAsBook(file: File): Promise<ImportEpubResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const { data } = await api.post("/admin/books/import-epub", formData);
+  return data;
+}
