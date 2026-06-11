@@ -1,9 +1,12 @@
 import io
+import logging
 from pathlib import Path
 
 from b2sdk.v2 import B2Api, InMemoryAccountInfo
 
 from app.config import settings
+
+logger = logging.getLogger("library.b2")
 
 _b2_api: B2Api | None = None
 _bucket = None
@@ -12,10 +15,26 @@ _bucket = None
 def _get_bucket():
     global _b2_api, _bucket
     if _bucket is None:
-        info = InMemoryAccountInfo()
-        _b2_api = B2Api(info)
-        _b2_api.authorize_account("production", settings.b2_key_id, settings.b2_app_key)
-        _bucket = _b2_api.get_bucket_by_name(settings.b2_bucket_name)
+        logger.info("Initialising B2 — key_id=%s... bucket=%s endpoint=%s",
+                     settings.b2_key_id[:4] + "****" if settings.b2_key_id else "(empty)",
+                     settings.b2_bucket_name or "(empty)",
+                     settings.b2_endpoint or "(empty)")
+        if not settings.b2_key_id or not settings.b2_app_key:
+            logger.error("B2 credentials are empty — check B2_KEY_ID / B2_APP_KEY env vars")
+            raise RuntimeError("B2 credentials not configured")
+        try:
+            info = InMemoryAccountInfo()
+            _b2_api = B2Api(info)
+            logger.info("Authorising B2 account...")
+            _b2_api.authorize_account("production", settings.b2_key_id, settings.b2_app_key)
+            logger.info("B2 auth OK — fetching bucket '%s'", settings.b2_bucket_name)
+            _bucket = _b2_api.get_bucket_by_name(settings.b2_bucket_name)
+            logger.info("B2 bucket acquired: %s", _bucket.name)
+        except Exception:
+            logger.exception("B2 initialisation failed")
+            _b2_api = None
+            _bucket = None
+            raise
     return _bucket
 
 
